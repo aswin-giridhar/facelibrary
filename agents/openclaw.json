@@ -1,0 +1,125 @@
+{
+  "env": {
+    "FLOCK_API_KEY": "${FLOCK_API_KEY}",
+    "ZAI_API_KEY": "${ZAI_API_KEY}",
+    "ANYWAY_API_KEY": "${ANYWAY_API_KEY}"
+  },
+
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "flock": {
+        "baseUrl": "https://api.flock.io/v1",
+        "apiKey": "${FLOCK_API_KEY}",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "qwen3-30b-a3b-instruct-2507",
+            "name": "Qwen3 30B (Fast)",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 32000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "qwen3-235b-a22b-instruct-2507",
+            "name": "Qwen3 235B (Primary)",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 32000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "qwen3-235b-a22b-thinking-2507",
+            "name": "Qwen3 235B Thinking (Reasoning)",
+            "reasoning": true,
+            "input": ["text"],
+            "contextWindow": 32000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "deepseek-v3.2",
+            "name": "DeepSeek V3.2 (Coding/Analysis)",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 64000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "kimi-k2.5",
+            "name": "Kimi K2.5",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          }
+        ]
+      },
+      "zai": {
+        "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+        "apiKey": "${ZAI_API_KEY}",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "glm-4-plus",
+            "name": "GLM-4 Plus (Contract Generation)",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          }
+        ]
+      }
+    }
+  },
+
+  "agents": {
+    "list": [
+      {
+        "id": "negotiator",
+        "workspace": "~/.openclaw/face-library/negotiator",
+        "model": { "primary": "flock/qwen3-235b-a22b-instruct-2507" }
+      },
+      {
+        "id": "compliance",
+        "workspace": "~/.openclaw/face-library/compliance",
+        "model": { "primary": "flock/deepseek-v3.2" }
+      },
+      {
+        "id": "contract",
+        "workspace": "~/.openclaw/face-library/contract",
+        "model": { "primary": "zai/glm-4-plus" }
+      },
+      {
+        "id": "audit",
+        "workspace": "~/.openclaw/face-library/audit",
+        "model": { "primary": "flock/qwen3-30b-a3b-instruct-2507" }
+      },
+      {
+        "id": "search",
+        "workspace": "~/.openclaw/face-library/search",
+        "model": { "primary": "flock/deepseek-v3.2" }
+      }
+    ],
+    "defaults": {
+      "workspace": "~/.openclaw/face-library/default"
+    }
+  },
+
+  "plugins": {
+    "enabled": true,
+    "allow": ["anyway-openclaw"],
+    "entries": {
+      "anyway-openclaw": {
+        "enabled": true,
+        "config": {
+          "endpoint": "https://trace-dev-collector.anyway.sh",
+          "serviceName": "face-library",
+          "captureContent": true,
+          "sampleRate": 1.0,
+          "flushIntervalMs": 5000
+        }
+      }
+    }
+  }
+}

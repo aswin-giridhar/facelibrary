@@ -1,0 +1,211 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-body);
+  --font-display: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: #FAFAF8;
+  --foreground: #0B0B0F;
+  --card: #FFFFFF;
+  --card-foreground: #0B0B0F;
+  --popover: #FFFFFF;
+  --popover-foreground: #0B0B0F;
+  --primary: #0B0B0F;
+  --primary-foreground: #FAFAF8;
+  --secondary: #F0F0EC;
+  --secondary-foreground: #0B0B0F;
+  --muted: #F0F0EC;
+  --muted-foreground: #6B6B73;
+  --accent: #1E3A5F;
+  --accent-foreground: #FAFAF8;
+  --destructive: #B91C1C;
+  --border: #E0E0DA;
+  --input: #E0E0DA;
+  --ring: #1E3A5F;
+  --chart-1: #1E3A5F;
+  --chart-2: #3B82F6;
+  --chart-3: #0B0B0F;
+  --chart-4: #6B6B73;
+  --chart-5: #A0A0A8;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body), system-ui, sans-serif;
+  }
+}
+
+/* ── Face Library Design System ────────────────────────── */
+
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
+.font-body {
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+/* Subtle noise texture overlay */
+.noise-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Fine crosshatch security pattern */
+.security-pattern {
+  background-image:
+    linear-gradient(45deg, transparent 48.5%, #0B0B0F05 48.5%, #0B0B0F05 51.5%, transparent 51.5%),
+    linear-gradient(-45deg, transparent 48.5%, #0B0B0F05 48.5%, #0B0B0F05 51.5%, transparent 51.5%);
+  background-size: 12px 12px;
+}
+
+/* Elegant line separator */
+.line-accent::after {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 1px;
+  background: #1E3A5F;
+  margin-top: 1rem;
+}
+
+/* Staggered reveal animation */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-reveal {
+  animation: fadeSlideUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+}
+
+.animate-reveal-1 { animation-delay: 0.1s; }
+.animate-reveal-2 { animation-delay: 0.2s; }
+.animate-reveal-3 { animation-delay: 0.3s; }
+.animate-reveal-4 { animation-delay: 0.4s; }
+.animate-reveal-5 { animation-delay: 0.5s; }
+.animate-reveal-6 { animation-delay: 0.6s; }
+.animate-reveal-7 { animation-delay: 0.7s; }
+
+/* Monogram styling */
+@keyframes monogramDraw {
+  from { stroke-dashoffset: 300; }
+  to { stroke-dashoffset: 0; }
+}
+
+.monogram-animate path {
+  stroke-dasharray: 300;
+  animation: monogramDraw 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Pipeline connector line */
+.pipeline-line {
+  background: linear-gradient(90deg, transparent, #1E3A5F 20%, #1E3A5F 80%, transparent);
+  height: 1px;
+}
+
+/* Card hover lift */
+.card-lift {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px -8px rgba(11, 11, 15, 0.12);
+}
+
+/* Agent card pulse ring */
+@keyframes pulseRing {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(30, 58, 95, 0.15); }
+  50% { box-shadow: 0 0 0 8px rgba(30, 58, 95, 0); }
+}
+.agent-pulse {
+  animation: pulseRing 3s ease-in-out infinite;
+}
+
+/* Scrolling feature bar */
+@keyframes scrollFeatures {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.scroll-features {
+  animation: scrollFeatures 30s linear infinite;
+}
+
+/* Subtle gradient border */
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, #1E3A5F, transparent 40%, transparent 60%, #1E3A5F);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
