@@ -1,8 +1,10 @@
-"""Unified LLM client wrapping FLock API (primary) and Z.AI GLM (secondary).
+"""Unified LLM client wrapping FLock API (primary), Z.AI GLM (secondary),
+and OpenRouter (fallback for Z.AI GLM models).
 
 Bounty coverage:
 - FLock.io: All open-source model inference via FLock API
-- Z.AI: GLM-4 Plus for contract generation and compliance summaries
+- Z.AI: GLM models for contract generation and compliance summaries
+  (direct Z.AI API -> OpenRouter GLM fallback)
 - AnyWay: OpenTelemetry tracing on every LLM call
 """
 import os
@@ -21,14 +23,28 @@ flock_client = OpenAI(
     default_headers={"x-litellm-api-key": os.getenv("FLOCK_API_KEY", "")},
 )
 
-# -- Z.AI GLM client ---------------------------------------------------------
+# -- Z.AI GLM client (direct) ------------------------------------------------
 
 zai_client = OpenAI(
     api_key=os.getenv("ZAI_API_KEY", ""),
     base_url=os.getenv("ZAI_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"),
 ) if os.getenv("ZAI_API_KEY") else None
 
-# -- Model mappings (all 5 FLock models + Z.AI) ------------------------------
+# -- OpenRouter client (fallback for Z.AI GLM models) ------------------------
+
+openrouter_client = OpenAI(
+    api_key=os.getenv("OPENROUTER_API_KEY", ""),
+    base_url="https://openrouter.ai/api/v1",
+) if os.getenv("OPENROUTER_API_KEY") else None
+
+# -- Model mappings (all 5 FLock models + Z.AI + OpenRouter GLM) --------------
+
+# OpenRouter GLM model mapping (used when Z.AI direct API fails)
+# GLM-4.5 via OpenRouter with reasoning disabled (thinking=off)
+OPENROUTER_GLM_MODELS = {
+    "glm-4-plus": "z-ai/glm-4.5",
+    "glm-4-plus-128k": "z-ai/glm-4.5",
+}
 
 MODELS = {
     # FLock models (Bounty 1: FLock.io)
@@ -37,7 +53,7 @@ MODELS = {
     "reasoning": os.getenv("FLOCK_MODEL_REASONING", "qwen3-235b-a22b-thinking-2507"),
     "creative": os.getenv("FLOCK_MODEL_CREATIVE", "qwen3-235b-a22b-instruct-2507"),
     "longctx": os.getenv("FLOCK_MODEL_LONGCTX", "kimi-k2.5"),
-    # Z.AI models (Bounty 2: Z.AI)
+    # Z.AI models (Bounty 2: Z.AI) — tried via direct API first, then OpenRouter
     "zai_primary": "glm-4-plus",
 }
 
@@ -52,6 +68,37 @@ MODEL_PROVIDERS = {
 }
 
 
+def _call_llm(client, model: str, messages: list[dict], temperature: float,
+               max_tokens: int, response_format: dict | None,
+               is_openrouter_glm: bool = False) -> dict:
+    """Low-level LLM call. Returns raw response dict or raises on failure."""
+    kwargs = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    if response_format:
+        kwargs["response_format"] = response_format
+    # Disable thinking/reasoning for OpenRouter GLM models
+    if is_openrouter_glm:
+        kwargs["extra_body"] = {"reasoning": {"effort": "none"}}
+    response = client.chat.completions.create(**kwargs)
+    msg = response.choices[0].message
+    content = msg.content
+    # Fallback: some GLM thinking models put output in reasoning field
+    if not content and hasattr(msg, "reasoning") and msg.reasoning:
+        content = msg.reasoning
+    usage = response.usage
+    return {
+        "content": content,
+        "model": model,
+        "tokens_used": usage.total_tokens if usage else 0,
+        "prompt_tokens": usage.prompt_tokens if usage else 0,
+        "completion_tokens": usage.completion_tokens if usage else 0,
+    }
+
+
 def chat(
     messages: list[dict],
     model_tier: str = "primary",
@@ -61,6 +108,11 @@ def chat(
     agent_name: str = "",
 ) -> dict:
     """Send a chat completion request to the appropriate LLM provider.
+
+    For Z.AI model tiers, the fallback chain is:
+      1. Z.AI direct API (glm-4-plus)
+      2. OpenRouter GLM model (z-ai/glm-4.5)
+      3. FLock reasoning model (qwen3-235b)
 
     Args:
         messages: List of message dicts with role/content
@@ -73,49 +125,52 @@ def chat(
     Returns:
         dict with 'content', 'model', 'tokens_used', 'provider'
     """
-    use_zai = model_tier.startswith("zai") and zai_client is not None
-    client = zai_client if use_zai else flock_client
+    is_zai_tier = model_tier.startswith("zai")
     model = MODELS.get(model_tier, MODELS["primary"])
-    provider = "zai" if use_zai else "flock"
 
-    kwargs = {
+    # Build the provider chain for Z.AI tiers: zai_direct -> openrouter -> flock
+    if is_zai_tier:
+        providers = []
+        if zai_client is not None:
+            providers.append(("zai", zai_client, model))
+        if openrouter_client is not None:
+            or_model = OPENROUTER_GLM_MODELS.get(model, "z-ai/glm-4.5")
+            providers.append(("openrouter_glm", openrouter_client, or_model))
+        # Final fallback: FLock reasoning
+        providers.append(("flock_glm_fallback", flock_client, MODELS["reasoning"]))
+    else:
+        providers = [("flock", flock_client, model)]
+
+    last_error = None
+    for provider, client, use_model in providers:
+        with trace_llm_call(use_model, provider, agent_name) as span:
+            try:
+                is_or_glm = provider == "openrouter_glm"
+                raw = _call_llm(client, use_model, messages, temperature,
+                                max_tokens, response_format,
+                                is_openrouter_glm=is_or_glm)
+                result = {**raw, "provider": provider}
+                record_llm_result(span, result)
+                if provider != providers[0][0]:
+                    print(f"[LLM] {agent_name}: {model_tier} served by {provider} ({use_model})")
+                return result
+            except Exception as e:
+                last_error = str(e)
+                span.set_attribute("llm.fallback_reason", last_error)
+                print(f"[LLM] {agent_name}: {provider}/{use_model} failed: {last_error}")
+                continue
+
+    # All providers failed
+    result = {
+        "content": f"[LLM Error: all providers failed. Last: {last_error}]",
         "model": model,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
+        "tokens_used": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "provider": "error",
+        "error": last_error,
     }
-    if response_format:
-        kwargs["response_format"] = response_format
-
-    # Anyway tracing: wrap every LLM call in a span
-    with trace_llm_call(model, provider, agent_name) as span:
-        try:
-            response = client.chat.completions.create(**kwargs)
-            content = response.choices[0].message.content
-            usage = response.usage
-            result = {
-                "content": content,
-                "model": model,
-                "tokens_used": usage.total_tokens if usage else 0,
-                "prompt_tokens": usage.prompt_tokens if usage else 0,
-                "completion_tokens": usage.completion_tokens if usage else 0,
-                "provider": provider,
-            }
-            record_llm_result(span, result)
-            return result
-        except Exception as e:
-            # Fallback: return error info but don't crash the agent pipeline
-            result = {
-                "content": f"[LLM Error: {str(e)}]",
-                "model": model,
-                "tokens_used": 0,
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "provider": "error",
-                "error": str(e),
-            }
-            record_llm_result(span, result)
-            return result
+    return result
 
 
 def chat_json(
@@ -154,10 +209,15 @@ def get_model_info() -> list[dict]:
     models = []
     for tier, model_id in MODELS.items():
         provider = MODEL_PROVIDERS.get(tier, "unknown")
+        if provider == "zai":
+            available = (zai_client is not None) or (openrouter_client is not None)
+        else:
+            available = True
         models.append({
             "tier": tier,
             "model_id": model_id,
             "provider": provider,
-            "available": True if provider == "flock" else (zai_client is not None),
+            "available": available,
+            "fallback": "openrouter_glm" if provider == "zai" and openrouter_client is not None else None,
         })
     return models
