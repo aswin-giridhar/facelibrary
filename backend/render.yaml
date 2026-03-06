@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: face-library-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: FLOCK_API_KEY
+        sync: false
+      - key: FLOCK_BASE_URL
+        sync: false
+      - key: ZAI_API_KEY
+        sync: false
+      - key: ZAI_BASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: ANYWAY_API_KEY
+        sync: false
+      - key: ANYWAY_ENDPOINT
+        sync: false
