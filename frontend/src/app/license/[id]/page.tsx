@@ -25,8 +25,9 @@ import {
   Shield,
   FileText,
   AlertTriangle,
+  CreditCard,
 } from "lucide-react";
-import { getLicense, approveLicense, getAuditTrail } from "@/lib/api";
+import { getLicense, approveLicense, getAuditTrail, createCheckoutSession } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 interface LicenseData {
@@ -50,6 +51,7 @@ interface LicenseData {
     model_used: string;
     generated_at: string;
   } | null;
+  payment_status: string | null;
   created_at: string;
 }
 
@@ -86,6 +88,7 @@ export default function LicenseDetailPage() {
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showContract, setShowContract] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -105,6 +108,20 @@ export default function LicenseDetailPage() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handlePayment = async () => {
+    setPaying(true);
+    try {
+      const result = await createCheckoutSession(id);
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url;
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Payment failed");
+    }
+    setPaying(false);
   };
 
   if (loading) {
@@ -271,6 +288,43 @@ export default function LicenseDetailPage() {
               <X className="w-4 h-4" />
               Reject License
             </button>
+          </div>
+        )}
+
+        {/* Payment */}
+        {(license.status === "approved" || license.status === "active") && (
+          <div className="bg-white border border-[#E0E0DA] rounded-lg p-6 mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <CreditCard className="w-4 h-4 text-[#1E3A5F]" />
+              <p className="font-body text-xs tracking-[0.15em] uppercase text-[#1E3A5F]">Payment</p>
+            </div>
+            {license.payment_status === "paid" ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 font-body text-sm text-emerald-700 bg-emerald-50 px-4 py-2 rounded-full">
+                  <Check className="w-4 h-4" />
+                  Paid
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <p className="font-body text-sm text-[#0B0B0F]">
+                    License fee: <span className="font-display text-lg">£{(license.proposed_price || 0).toLocaleString()}</span>
+                  </p>
+                  <p className="font-body text-xs text-[#6B6B73] mt-1">
+                    Secure payment via Stripe Connect. 10% platform fee included.
+                  </p>
+                </div>
+                <button
+                  onClick={handlePayment}
+                  disabled={paying}
+                  className="inline-flex items-center gap-2 bg-[#1E3A5F] text-white font-body text-sm font-medium px-6 py-3 rounded-md hover:bg-[#0B0B0F] transition-colors disabled:opacity-50"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  {paying ? "Redirecting..." : "Pay Now"}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

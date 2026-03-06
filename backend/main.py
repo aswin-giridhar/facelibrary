@@ -586,6 +586,7 @@ def get_brand_requests(brand_id: int, db: Session = Depends(get_db)):
             "license_token": lr.license_token,
             "orchestration_status": lr.orchestration_status,
             "has_contract": contract is not None,
+            "payment_status": lr.payment_status,
             "created_at": lr.created_at.isoformat(),
         })
     return results
@@ -919,6 +920,7 @@ def get_license(license_id: int, db: Session = Depends(get_db)):
             "model_used": contract.model_used,
             "generated_at": contract.created_at.isoformat(),
         } if contract else None,
+        "payment_status": lr.payment_status,
         "created_at": lr.created_at.isoformat(),
         "updated_at": lr.updated_at.isoformat() if lr.updated_at else None,
     }

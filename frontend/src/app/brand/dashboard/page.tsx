@@ -14,7 +14,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Send, Zap, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { Send, Zap, ChevronDown, ChevronUp, Search, CreditCard } from "lucide-react";
 import DashboardNav from "@/components/DashboardNav";
 import { useAuth } from "@/lib/auth";
 import {
@@ -23,6 +23,7 @@ import {
   processLicense,
   getBrandRequests,
   getAuditTrail,
+  createCheckoutSession,
 } from "@/lib/api";
 
 interface TalentListItem {
@@ -49,6 +50,7 @@ interface BrandRequestItem {
   negotiation_notes: string | null;
   compliance_notes: string | null;
   has_contract: boolean;
+  payment_status: string | null;
   created_at: string;
 }
 
@@ -81,6 +83,7 @@ export default function BrandDashboardPage() {
   const [submitting, setSubmitting] = useState(false);
   const [orchestrating, setOrchestrating] = useState<number | null>(null);
   const [message, setMessage] = useState("");
+  const [payingId, setPayingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "brand")) {
@@ -156,6 +159,19 @@ export default function BrandDashboardPage() {
         setLogs((prev) => ({ ...prev, [id]: [] }));
       }
     }
+  };
+
+  const handlePay = async (licenseId: number) => {
+    setPayingId(licenseId);
+    try {
+      const result = await createCheckoutSession(licenseId);
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url;
+      }
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Payment failed");
+    }
+    setPayingId(null);
   };
 
   if (authLoading) {
@@ -299,6 +315,19 @@ export default function BrandDashboardPage() {
                           <Zap className="w-3.5 h-3.5" />
                           {orchestrating === r.id ? "Processing..." : "Run Orchestrator"}
                         </button>
+                      )}
+                      {(r.status === "approved" || r.status === "active") && r.payment_status !== "paid" && (
+                        <button
+                          onClick={() => handlePay(r.id)}
+                          disabled={payingId === r.id}
+                          className="flex items-center gap-1 font-body text-xs bg-[#1E3A5F] text-white px-3 py-1.5 rounded-md hover:bg-[#0B0B0F] transition-colors disabled:opacity-50"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          {payingId === r.id ? "Redirecting..." : "Pay"}
+                        </button>
+                      )}
+                      {r.payment_status === "paid" && (
+                        <span className="font-body text-xs text-emerald-600 px-2 py-1">Paid</span>
                       )}
                       <Link
                         href={`/license/${r.id}`}
