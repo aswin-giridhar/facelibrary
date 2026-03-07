@@ -268,35 +268,92 @@ export default function AgentDashboardPage() {
           </div>
         )}
 
-        {/* Architecture Diagram */}
+        {/* Pipeline Architecture */}
         <div className="bg-[#0B0B0F] rounded-lg p-8 lg:p-12 text-[#FAFAF8]">
-          <p className="font-body text-xs tracking-[0.25em] uppercase text-[#FAFAF8]/40 mb-4">
+          <p className="font-body text-xs tracking-[0.25em] uppercase text-[#FAFAF8]/40 mb-2">
             Pipeline Architecture
           </p>
-          <pre className="font-mono text-xs leading-relaxed text-[#FAFAF8]/70 overflow-x-auto">
-{`  ┌──────────────────────────────────────────────────────────────────┐
-  │                 OPENCLAW PIPELINE ORCHESTRATOR (v2.0)            │
-  │                                                                  │
-  │   Request ──▶ 1. Compliance   ──▶ 2. Pricing     ──▶ 3. IP      │
-  │                  & Risk Agent      Negotiator        Contract    │
-  │                  DeepSeek V3.2     Qwen3 235B        GLM-4 Plus │
-  │                  + GLM Summary                     + Qwen3 fallb │
-  │                     │                 │                │         │
-  │                     ▼                 ▼                ▼         │
-  │   4. License Token ──▶ 5. Avatar       ──▶ 6. Likeness          │
-  │      (UUID issue)       Generation          Fingerprint          │
-  │                         (Z.AI prompt)       (Usage scan)         │
-  │                              │                   │               │
-  │                              ▼                   ▼               │
-  │                        7. Web3 Rights ──▶ Audit & Logging        │
-  │                        (ERC-721/Polygon)                         │
-  │                                                                  │
-  │   FLock.io: Qwen3 30B/235B · DeepSeek V3.2 · Kimi K2.5        │
-  │   Z.AI:    GLM-4 Plus (128K context)                             │
-  │   Tracing: Anyway SDK (OpenTelemetry)                            │
-  │   SDG:     8 (Decent Work) · 10 (Equality) · 16 (Justice)      │
-  └──────────────────────────────────────────────────────────────────┘`}
-          </pre>
+          <h2 className="font-display text-2xl font-light text-[#FAFAF8] mb-8">
+            OpenClaw Pipeline <span className="italic">Orchestrator</span> <span className="text-[#FAFAF8]/40 text-base">v2.0</span>
+          </h2>
+
+          {/* Pipeline Steps */}
+          <div className="space-y-3 mb-10">
+            {[
+              { step: 1, name: "Compliance & Risk", model: "DeepSeek V3.2 + GLM-4 Summary", color: "#B45309", blocking: true, desc: "Content, brand, legal, ethical & geographic risk assessment" },
+              { step: 2, name: "Pricing Negotiator", model: "Qwen3 235B Instruct", color: "#1E3A5F", blocking: false, desc: "Dynamic pricing based on talent preferences & market rates" },
+              { step: 3, name: "IP Contract Generation", model: "GLM-4 Plus (Z.AI)", color: "#0F766E", blocking: false, desc: "12-section UK-law-compliant IP licensing agreement" },
+              { step: 4, name: "License Token", model: "Local (UUID)", color: "#6B21A8", blocking: false, desc: "Unique license token issued for tracking" },
+              { step: 5, name: "Avatar Generation", model: "DeepSeek V3.2", color: "#7C3AED", blocking: false, desc: "Detailed image/avatar prompt for licensed content" },
+              { step: 6, name: "Likeness Fingerprint", model: "DeepSeek V3.2", color: "#E11D48", blocking: false, desc: "Unauthorized use detection scan across platforms" },
+              { step: 7, name: "Web3 Rights", model: "Local (Polygon)", color: "#0891B2", blocking: false, desc: "ERC-721 smart contract metadata for on-chain IP rights" },
+            ].map((s, i) => (
+              <div key={s.step} className="flex items-stretch gap-4">
+                {/* Step number + connector */}
+                <div className="flex flex-col items-center w-10 flex-shrink-0">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-display text-sm font-bold flex-shrink-0"
+                    style={{ backgroundColor: s.color }}
+                  >
+                    {s.step}
+                  </div>
+                  {i < 6 && (
+                    <div className="w-0.5 flex-1 min-h-[12px] bg-gradient-to-b from-white/30 to-white/5" />
+                  )}
+                </div>
+                {/* Content */}
+                <div className="flex-1 pb-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="font-body text-sm font-medium text-[#FAFAF8]">{s.name}</h3>
+                    {s.blocking && (
+                      <span className="font-body text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 uppercase tracking-wider">Blocking</span>
+                    )}
+                  </div>
+                  <p className="font-body text-xs text-[#FAFAF8]/50 mt-0.5">{s.desc}</p>
+                  <span className="inline-block font-mono text-[10px] text-[#FAFAF8]/30 mt-1 px-2 py-0.5 rounded bg-white/5">{s.model}</span>
+                </div>
+              </div>
+            ))}
+            {/* Audit (always runs) */}
+            <div className="flex items-stretch gap-4">
+              <div className="flex flex-col items-center w-10 flex-shrink-0">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-display text-sm font-bold flex-shrink-0 bg-white/10 border border-white/20">
+                  ✓
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3">
+                  <h3 className="font-body text-sm font-medium text-[#FAFAF8]">Audit & Logging</h3>
+                  <span className="font-body text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 uppercase tracking-wider">Every Step</span>
+                </div>
+                <p className="font-body text-xs text-[#FAFAF8]/50 mt-0.5">Immutable audit trail — agent, model, tokens, timestamp logged per action</p>
+                <span className="inline-block font-mono text-[10px] text-[#FAFAF8]/30 mt-1 px-2 py-0.5 rounded bg-white/5">Local (Claw Console)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Short-circuit note */}
+          <div className="border border-amber-500/20 rounded-lg p-4 mb-8 bg-amber-500/5">
+            <p className="font-body text-xs text-amber-400">
+              <span className="font-medium">Short-Circuit:</span>{" "}
+              <span className="text-[#FAFAF8]/50">If Step 1 (Compliance) recommends rejection, steps 2–7 are skipped and the failure is logged.</span>
+            </p>
+          </div>
+
+          {/* Infrastructure bar */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { label: "FLock.io", detail: "Qwen3 235B · DeepSeek V3.2", color: "border-blue-500/30" },
+              { label: "Z.AI", detail: "GLM-4 Plus (128K context)", color: "border-emerald-500/30" },
+              { label: "Anyway SDK", detail: "OpenTelemetry tracing", color: "border-purple-500/30" },
+              { label: "SDG Alignment", detail: "8 · 10 · 16", color: "border-amber-500/30" },
+            ].map((item) => (
+              <div key={item.label} className={`rounded-lg border ${item.color} bg-white/5 p-3`}>
+                <p className="font-body text-[10px] tracking-[0.15em] uppercase text-[#FAFAF8]/60">{item.label}</p>
+                <p className="font-body text-xs text-[#FAFAF8]/40 mt-0.5">{item.detail}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
