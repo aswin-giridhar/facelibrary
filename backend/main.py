@@ -1333,6 +1333,7 @@ def telegram_webhook(update: TelegramUpdate, db: Session = Depends(get_db)):
             "/search <query> - Search for talent\n"
             "/status <license_id> - Check license status\n"
             "/agents - View AI agent system\n"
+            "/clear - Clear chat\n"
             "/help - Show this message"
         )
 
@@ -1387,12 +1388,16 @@ def telegram_webhook(update: TelegramUpdate, db: Session = Depends(get_db)):
             "9. Pipeline Orchestrator - Coordinates all"
         )
 
+    elif text.startswith("/clear"):
+        reply = "\n" * 50 + "Chat cleared.\nUse /help to see available commands."
+
     elif text.startswith("/help"):
         reply = (
             "Face Library Bot Commands:\n\n"
             "/search <query> - Search for talent\n"
             "/status <license_id> - Check license status\n"
             "/agents - View AI agent system\n"
+            "/clear - Clear chat history\n"
             "/help - Show this message\n\n"
             "Web: https://face-library.vercel.app\n"
             "API: https://face-library.onrender.com/docs"
