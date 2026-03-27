@@ -1,36 +1,74 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, CheckCircle, MapPin, Shield } from "lucide-react";
-import { createLicenseRequest } from "@/lib/api";
+import { createLicenseRequest, getTalent } from "@/lib/api";
 
-const talentDB: Record<string, { name: string; image: string; faceId: string; gender: string; age: number; location: string; categories: string[]; regions: string[]; usageAllowed: string[]; bio: string; portfolio: string[]; pricing: Record<string, string> }> = {
-  "1": { name: "Sophia Anderson", image: "https://images.unsplash.com/flagged/photo-1573582677725-863b570e3c00?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600", faceId: "FL-238491", gender: "Female", age: 28, location: "London, UK", categories: ["Fashion", "Beauty", "Lifestyle"], regions: ["Global", "UK", "Europe"], usageAllowed: ["Social Media", "Website", "Print", "TV"], bio: "Professional digital face available for AI-generated campaigns. Experienced in fashion, beauty, and lifestyle content.", portfolio: ["https://images.unsplash.com/flagged/photo-1573582677725-863b570e3c00?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600", "https://images.unsplash.com/photo-1654028859265-0e8b12a67aae?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600", "https://images.unsplash.com/photo-1633419798503-0b0c628f267c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600"], pricing: { social: "£500/month", website: "£800/month", print: "£1,200/campaign", tv: "£2,500/campaign" } },
-  "2": { name: "Alex Turner", image: "https://images.unsplash.com/photo-1762522927402-f390672558d8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600", faceId: "FL-238492", gender: "Male", age: 32, location: "Manchester, UK", categories: ["Tech", "Lifestyle", "Sports"], regions: ["Global", "UK"], usageAllowed: ["Social Media", "Website", "TV"], bio: "Tech and lifestyle specialist. Available for digital campaigns and AI-generated content.", portfolio: ["https://images.unsplash.com/photo-1762522927402-f390672558d8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600"], pricing: { social: "£400/month", website: "£700/month", print: "£1,000/campaign", tv: "£2,000/campaign" } },
-};
+const defaultImages = [
+  "https://images.unsplash.com/flagged/photo-1573582677725-863b570e3c00?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "https://images.unsplash.com/photo-1654028859265-0e8b12a67aae?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "https://images.unsplash.com/photo-1633419798503-0b0c628f267c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+];
 
 export default function TalentProfilePage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+  const talentId = parseInt(id) || 1;
+
+  const [talent, setTalent] = useState<{
+    name: string; image: string; faceId: string; gender: string;
+    age: number; location: string; categories: string[];
+    regions: string[]; usageAllowed: string[]; bio: string;
+    portfolio: string[]; pricing: Record<string, string>;
+    min_price: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showLicenseModal, setShowLicenseModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [licenseForm, setLicenseForm] = useState({
-    campaignName: "",
-    usageType: "",
-    duration: "",
-    region: "",
-    details: "",
+    campaignName: "", usageType: "", duration: "", region: "", details: "",
   });
 
-  const talent = talentDB[id] || talentDB["1"];
-
-  // Map the static talent ID to a real backend talent_id
-  // The backend has: 1=Olga Bonny, 2=Emma Clarke, 3=Marcus Chen
-  const backendTalentId = parseInt(id) <= 3 ? parseInt(id) : 1;
+  useEffect(() => {
+    getTalent(talentId)
+      .then((t) => {
+        const cats = (t.categories || "").split(",").filter(Boolean);
+        const geo = (t.geo_scope || "global").split(",").filter(Boolean);
+        setTalent({
+          name: t.name || t.stage_name || "Unknown",
+          image: t.image_url || t.avatar_url || defaultImages[0],
+          faceId: `FL-${String(t.id).padStart(6, "0")}`,
+          gender: t.gender || "Not specified",
+          age: t.age || 0,
+          location: t.nationality ? `${t.nationality}` : "UK",
+          categories: cats.length ? cats : ["General"],
+          regions: geo,
+          usageAllowed: [
+            ...(t.allow_image_generation !== false ? ["Image"] : []),
+            ...(t.allow_video_generation !== false ? ["Video"] : []),
+            ...(t.allow_ai_training ? ["AI Training"] : []),
+          ],
+          bio: t.bio || "Digital likeness available for licensed campaigns.",
+          portfolio: [t.image_url || defaultImages[0], ...defaultImages.slice(1)],
+          pricing: {
+            social: `£${t.min_price_per_use || 500}/month`,
+            website: `£${Math.round((t.min_price_per_use || 500) * 1.6)}/month`,
+            print: `£${Math.round((t.min_price_per_use || 500) * 2.4)}/campaign`,
+            tv: `£${Math.round((t.min_price_per_use || 500) * 5)}/campaign`,
+          },
+          min_price: t.min_price_per_use || 100,
+        });
+      })
+      .catch(() => {
+        // Fallback for non-existent IDs
+        setTalent(null);
+      })
+      .finally(() => setLoading(false));
+  }, [talentId]);
 
   const handleLicenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,13 +76,13 @@ export default function TalentProfilePage() {
     setSubmitError("");
     try {
       await createLicenseRequest({
-        talent_id: backendTalentId,
+        talent_id: talentId,
         license_type: "standard",
         use_case: `${licenseForm.campaignName} — ${licenseForm.usageType}. ${licenseForm.details}`,
         desired_duration_days: parseInt(licenseForm.duration) * 30 || 90,
         desired_regions: licenseForm.region,
         content_type: licenseForm.usageType === "tv" ? "video" : "image",
-        proposed_price: null,
+        proposed_price: talent?.min_price || null,
       });
       setShowLicenseModal(false);
       router.push("/client/dashboard");
@@ -54,6 +92,25 @@ export default function TalentProfilePage() {
       setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!talent) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Talent not found.</p>
+          <Link href="/discover-talent" className="text-black underline hover:no-underline">Browse Talent</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">

@@ -97,6 +97,7 @@ export default function ClientDashboardPage() {
 
   const [talents, setTalents] = useState<TalentListItem[]>([]);
   const [requests, setRequests] = useState<ClientRequestItem[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
   const [selectedTalents, setSelectedTalents] = useState<number[]>([]);
   const [message, setMessage] = useState("");
   const [generatingId, setGeneratingId] = useState<number | null>(null);
@@ -146,6 +147,8 @@ export default function ClientDashboardPage() {
       }
     } catch {
       // silent
+    } finally {
+      setDataLoading(false);
     }
   };
 
@@ -449,7 +452,12 @@ export default function ClientDashboardPage() {
               <h3 className="text-sm font-semibold text-gray-900 mb-4">
                 Offers in Progress
               </h3>
-              {requests.length === 0 ? (
+              {dataLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-black" />
+                  Loading offers...
+                </div>
+              ) : requests.length === 0 ? (
                 <p className="text-sm text-gray-500">
                   No offers submitted yet. Select talent above to get started.
                 </p>

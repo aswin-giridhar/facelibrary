@@ -156,7 +156,7 @@ export default function LicenseDetailPage() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">{error || (user ? "License not found or you don't have access." : "Please log in to view this license.")}</p>
+          <p className="text-gray-600 mb-4">{error || (user ? "License not found, or you don\u2019t have access to view it." : "Please log in to view this license.")}</p>
           <Link href={user ? backPath : "/login"} className="text-black underline hover:no-underline">
             {user ? "Back to Dashboard" : "Log In"}
           </Link>
