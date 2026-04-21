@@ -383,36 +383,40 @@ export default function HomePage() {
       {/* 5 Step Cards */}
       <section className="pb-20 md:pb-24">
         <div className="max-w-[1400px] mx-auto px-6 md:px-8">
-          {/* Desktop: flex with inline arrows (matches Figma) */}
-          <div className="hidden lg:flex items-start gap-4 xl:gap-6">
+          {/* Desktop: flex with inline arrows (matches Figma).
+              items-stretch ensures all cards share the row's tallest height.
+              Each card is a flex-col so header/desc/image/caption stack,
+              and mt-auto on the image wrapper anchors images to the same
+              baseline from the bottom regardless of description length. */}
+          <div className="hidden lg:flex items-stretch gap-4 xl:gap-6">
             {steps.map((step, idx) => (
               <Fragment key={step.num}>
-                <div className="flex-1">
-                  <div className="bg-white rounded-[20px] shadow-sm border border-gray-100 p-6 h-full">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
-                        {step.num}
-                      </div>
-                      <h3 className="font-semibold text-lg">{step.title}</h3>
+                <div className="flex-1 flex flex-col bg-white rounded-[20px] shadow-sm border border-gray-100 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                      {step.num}
                     </div>
-                    <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-                      {step.desc}
-                    </p>
-                    <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-3 bg-gray-100">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={step.image}
-                        alt={step.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 text-center">
-                      {step.caption}
-                    </p>
+                    <h3 className="font-semibold text-lg leading-tight">
+                      {step.title}
+                    </h3>
                   </div>
+                  <p className="text-sm text-gray-600 leading-relaxed mb-6 min-h-[4.5rem]">
+                    {step.desc}
+                  </p>
+                  <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-3 bg-gray-100 mt-auto">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={step.image}
+                      alt={step.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 text-center">
+                    {step.caption}
+                  </p>
                 </div>
                 {idx < steps.length - 1 && (
-                  <div className="pt-40 flex-shrink-0">
+                  <div className="flex-shrink-0 self-center">
                     <ArrowRight className="w-6 h-6 text-gray-300" />
                   </div>
                 )}
@@ -420,23 +424,27 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* Mobile/tablet: stacked grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:hidden">
+          {/* Mobile/tablet: stacked grid. items-stretch gives equal-height
+              cards within each row; min-h on description keeps images
+              aligned across the two columns on md. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:hidden items-stretch">
             {steps.map((step) => (
               <div
                 key={step.num}
-                className="bg-white rounded-[20px] shadow-sm border border-gray-100 p-6"
+                className="flex flex-col bg-white rounded-[20px] shadow-sm border border-gray-100 p-6"
               >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
                     {step.num}
                   </div>
-                  <h3 className="font-semibold text-lg">{step.title}</h3>
+                  <h3 className="font-semibold text-lg leading-tight">
+                    {step.title}
+                  </h3>
                 </div>
-                <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+                <p className="text-sm text-gray-600 leading-relaxed mb-6 min-h-[4.5rem]">
                   {step.desc}
                 </p>
-                <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-3 bg-gray-100">
+                <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-3 bg-gray-100 mt-auto">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={step.image}
