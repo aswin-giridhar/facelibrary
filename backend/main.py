@@ -37,6 +37,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from supabase_client import supabase_admin, supabase as supabase_public
 from agents.contract import ContractAgent
+from llm_client import LLMError
 
 contract_agent = ContractAgent()
 
@@ -868,11 +869,24 @@ def generate_contract(license_id: int, current_user: dict = Depends(get_current_
         "desired_regions": lic.get("desired_regions"), "proposed_price": lic.get("proposed_price"),
     }
 
-    result = contract_agent.generate_contract(talent_data, client_data, request_data)
+    try:
+        result = contract_agent.generate_contract(talent_data, client_data, request_data)
+    except LLMError as e:
+        # Fail loudly: don't insert a stub contract or flip contract_generated.
+        # The client should see a 502 and can retry; the SDK has already retried
+        # transient 5xx/429 three times before we get here.
+        raise HTTPException(
+            status_code=502,
+            detail=f"Contract generator is temporarily unavailable. Please try again shortly. ({e})",
+        )
+
+    contract_text = (result.get("contract_text") or "").strip()
+    if not contract_text:
+        raise HTTPException(502, "Contract generator returned an empty response. Please try again.")
 
     db().table("contracts").insert({
         "license_id": license_id, "license_type": lic.get("license_type"),
-        "contract_text": result["contract_text"],
+        "contract_text": contract_text,
     }).execute()
 
     db().table("license_requests").update({
@@ -896,7 +910,11 @@ def validate_contract(license_id: int, current_user: dict = Depends(get_current_
     if not c_res.data:
         raise HTTPException(404, "No contract found")
 
-    result = contract_agent.validate_contract(c_res.data[0]["contract_text"])
+    try:
+        result = contract_agent.validate_contract(c_res.data[0]["contract_text"])
+    except LLMError as e:
+        raise HTTPException(502, f"Validator is temporarily unavailable. Please try again shortly. ({e})")
+
     _log_audit(license_id, "contract_agent", "contract_validated",
                f"Validation: {json.dumps(result.get('result', {}))[:500]}",
                result["model"], result["tokens_used"])
@@ -913,10 +931,18 @@ def improve_contract(license_id: int, req: ContractImproveRequest, current_user:
     if not c_res.data:
         raise HTTPException(404, "No contract found")
 
-    result = contract_agent.improve_contract(c_res.data[0]["contract_text"], req.feedback)
+    try:
+        result = contract_agent.improve_contract(c_res.data[0]["contract_text"], req.feedback)
+    except LLMError as e:
+        raise HTTPException(502, f"Contract revisor is temporarily unavailable. Please try again shortly. ({e})")
+
+    improved = (result.get("contract_text") or "").strip()
+    if not improved:
+        raise HTTPException(502, "Contract revisor returned an empty response. Please try again.")
+
     db().table("contracts").insert({
         "license_id": license_id, "license_type": c_res.data[0].get("license_type"),
-        "contract_text": result["contract_text"],
+        "contract_text": improved,
     }).execute()
     _log_audit(license_id, "contract_agent", "contract_improved",
                f"Improved: {req.feedback[:200]}", result["model"], result["tokens_used"])
