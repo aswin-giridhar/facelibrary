@@ -28,7 +28,7 @@ client = OpenAI(
     timeout=60.0,
 )
 
-MODEL = os.getenv("LLM_MODEL", os.getenv("FLOCK_MODEL_FAST", "deepseek-v3.2"))
+MODEL = os.getenv("LLM_MODEL", os.getenv("FLOCK_MODEL_FAST", "kimi-k2-thinking"))
 
 
 def chat(
