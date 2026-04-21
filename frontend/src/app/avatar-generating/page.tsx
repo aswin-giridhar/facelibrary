@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Loader2, CheckCircle, Sparkles } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2, CheckCircle, Sparkles, AlertTriangle } from "lucide-react";
+import { getAvatarJob } from "@/lib/api";
 
 const steps = [
   "Analyzing face photos...",
@@ -15,46 +16,107 @@ const steps = [
   "Finalizing avatar...",
 ];
 
-export default function AvatarGeneratingPage() {
+type JobStatus = "processing" | "completed" | "failed";
+
+interface Job {
+  id: number;
+  status: JobStatus;
+  output_avatar_url: string | null;
+  model_used: string | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+function AvatarGeneratingContent() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [progress, setProgress] = useState(0);
-  const [complete, setComplete] = useState(false);
+  const searchParams = useSearchParams();
+  const jobIdParam = searchParams.get("jobId");
+  const jobId = jobIdParam ? parseInt(jobIdParam) : null;
 
+  const [job, setJob] = useState<Job | null>(null);
+  const [elapsedPct, setElapsedPct] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  // Without a jobId we can't poll anything — send the user back to the form.
   useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setComplete(true);
-          return 100;
+    if (!jobId) {
+      router.replace("/create-avatar");
+    }
+  }, [jobId, router]);
+
+  // Poll the job every 2s until it completes or fails.
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const j = (await getAvatarJob(jobId)) as Job;
+        if (cancelled) return;
+        setJob(j);
+        if (j.status === "processing") {
+          setTimeout(poll, 2000);
         }
-        return prev + 1;
-      });
-    }, 80);
+      } catch (e) {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Failed to fetch avatar status");
+      }
+    };
 
-    return () => clearInterval(interval);
-  }, []);
+    poll();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId]);
 
+  // Smooth progress bar — target 90% while processing, jump to 100 on completion.
   useEffect(() => {
-    const stepIndex = Math.min(Math.floor(progress / (100 / steps.length)), steps.length - 1);
-    setCurrentStep(stepIndex);
-  }, [progress]);
+    if (!job) return;
+    if (job.status === "completed") {
+      setElapsedPct(100);
+      return;
+    }
+    if (job.status === "failed") return;
+    const tick = setInterval(() => {
+      setElapsedPct((prev) => (prev < 90 ? prev + 1 : prev));
+    }, 150);
+    return () => clearInterval(tick);
+  }, [job]);
+
+  const currentStep = Math.min(
+    Math.floor(elapsedPct / (100 / steps.length)),
+    steps.length - 1,
+  );
+
+  const complete = job?.status === "completed";
+  const failed = job?.status === "failed" || !!error;
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center py-12 px-6">
       <div className="w-full max-w-lg text-center">
-        {/* Logo */}
         <Link href="/" className="inline-flex items-center gap-2 mb-10">
-          <div className="w-10 h-10 bg-black text-white flex items-center justify-center text-sm font-bold">
-            FL
-          </div>
+          <div className="w-10 h-10 bg-black text-white flex items-center justify-center text-sm font-bold">FL</div>
           <span className="font-semibold text-lg tracking-wide">FACE LIBRARY</span>
         </Link>
 
-        {!complete ? (
+        {failed ? (
           <>
-            {/* Spinner */}
+            <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-8">
+              <AlertTriangle className="w-12 h-12 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-semibold mb-3">Avatar Generation Failed</h1>
+            <p className="text-gray-600 mb-8 bg-red-50 border border-red-200 rounded-lg p-4 text-sm">
+              {error || job?.error_message || "Something went wrong. Please try again."}
+            </p>
+            <button
+              onClick={() => router.push("/create-avatar")}
+              className="w-full bg-black text-white py-3 px-6 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+            >
+              Back to Upload
+            </button>
+          </>
+        ) : !complete ? (
+          <>
             <div className="w-24 h-24 mx-auto mb-8 relative">
               <div className="absolute inset-0 rounded-full border-4 border-gray-200" />
               <div
@@ -67,18 +129,18 @@ export default function AvatarGeneratingPage() {
             </div>
 
             <h1 className="text-2xl font-semibold mb-3">Generating Your Avatar</h1>
-            <p className="text-gray-600 mb-8">This may take a few minutes. Please don&apos;t close this page.</p>
+            <p className="text-gray-600 mb-8">
+              This may take a few minutes. Please don&apos;t close this page.
+            </p>
 
-            {/* Progress bar */}
             <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
               <div
                 className="bg-black h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
+                style={{ width: `${elapsedPct}%` }}
               />
             </div>
-            <p className="text-sm text-gray-500 mb-6">{progress}% complete</p>
+            <p className="text-sm text-gray-500 mb-6">{elapsedPct}% complete</p>
 
-            {/* Steps */}
             <div className="bg-gray-50 rounded-xl p-6 text-left">
               <div className="space-y-3">
                 {steps.map((step, i) => (
@@ -100,7 +162,6 @@ export default function AvatarGeneratingPage() {
           </>
         ) : (
           <>
-            {/* Complete */}
             <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-8">
               <CheckCircle className="w-12 h-12 text-green-600" />
             </div>
@@ -112,17 +173,24 @@ export default function AvatarGeneratingPage() {
 
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 mb-8">
               <div className="grid grid-cols-3 gap-4 mb-4">
-                <div className="aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-8 h-8 text-gray-400" />
-                </div>
-                <div className="aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-8 h-8 text-gray-400" />
-                </div>
-                <div className="aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-8 h-8 text-gray-400" />
-                </div>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="aspect-square bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    {job?.output_avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={job.output_avatar_url} alt="Avatar preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Sparkles className="w-8 h-8 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-              <p className="text-xs text-gray-500 text-center">Avatar previews will appear here</p>
+              {job?.model_used && (
+                <p className="text-xs text-gray-500 text-center">
+                  Generated by {job.model_used}
+                </p>
+              )}
             </div>
 
             <button
@@ -135,5 +203,19 @@ export default function AvatarGeneratingPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AvatarGeneratingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent" />
+        </div>
+      }
+    >
+      <AvatarGeneratingContent />
+    </Suspense>
   );
 }

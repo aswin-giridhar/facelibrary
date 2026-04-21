@@ -861,16 +861,22 @@ export default function TalentDashboardPage() {
                 </button>
               </div>
               {hasPaymentMethod ? (
-                <div className="border border-gray-200 rounded-lg p-3">
+                <div className="border border-gray-200 rounded-lg p-3 mb-4">
                   <p className="text-xs text-gray-500 mb-1">Bank Account</p>
                   <p className="text-sm font-medium text-gray-900">{paymentMethod.bankName}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{paymentMethod.accountNumber}</p>
                 </div>
               ) : (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 mb-4">
                   No payment method set. Add one to receive earnings.
                 </p>
               )}
+              <Link
+                href="/talent/earnings"
+                className="block text-center text-xs bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                View Earnings &amp; Payouts →
+              </Link>
             </div>
           </div>
         </div>

@@ -74,9 +74,13 @@ export default function LicenseDetailPage() {
       getLicense(id).then(setLicense),
       getAuditTrail(id).then(setAudit).catch(() => setAudit([])),
     ])
-      .catch(() => {
-        // Don't use raw API error — show the user-friendly fallback message instead
-        setError("");
+      .catch((e) => {
+        // Show a friendly error in the UI instead of silently swallowing
+        setError(
+          e instanceof Error && e.message
+            ? e.message
+            : "License not found, or you don't have access to view it.",
+        );
       })
       .finally(() => setLoading(false));
   };

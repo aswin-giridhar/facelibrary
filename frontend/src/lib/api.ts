@@ -172,3 +172,59 @@ export const getLicenseTemplates = () => fetchAPI("/api/license-templates");
 
 // Health
 export const getHealth = () => fetchAPI("/api/health");
+
+// AI Chat (real LLM via Kimi K2 Thinking)
+export type ChatVariant = "client" | "agent" | "talent";
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
+export const postChat = (variant: ChatVariant, messages: ChatMessage[]) =>
+  fetchAPI("/api/chat", {
+    method: "POST",
+    body: JSON.stringify({ variant, messages }),
+  }) as Promise<{ reply: string; model: string; tokens_used: number }>;
+
+// Email verification
+export const resendVerification = (email: string) =>
+  fetchAPI("/api/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+
+export const getVerificationStatus = () =>
+  fetchAPI("/api/auth/verification-status") as Promise<{ verified: boolean }>;
+
+// Payouts
+export const getEarnings = () =>
+  fetchAPI("/api/payouts/earnings") as Promise<{
+    gross_revenue: number;
+    total_earned: number;
+    paid_out: number;
+    pending_payout: number;
+    available_balance: number;
+  }>;
+
+export const listPayouts = () => fetchAPI("/api/payouts/list");
+
+export const requestPayout = (data: {
+  amount: number;
+  bank_account_ref?: string;
+  notes?: string;
+}) =>
+  fetchAPI("/api/payouts/request", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
+// Avatar generation jobs
+export const submitAvatarJob = (data: {
+  face_photo_count: number;
+  body_photo_count: number;
+  identity_video_ref?: string;
+}) =>
+  fetchAPI("/api/talent/avatar/submit", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
+export const getAvatarJob = (jobId: number) =>
+  fetchAPI(`/api/talent/avatar/${jobId}`);

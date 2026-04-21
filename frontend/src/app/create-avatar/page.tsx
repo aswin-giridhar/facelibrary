@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Upload, Sun, Image as ImageIcon, Sparkles, Eye, Wind, Glasses, Smile } from "lucide-react";
+import { ArrowLeft, Upload, Sun, Image as ImageIcon, Sparkles, Eye, Wind, Glasses, Smile, Loader2 } from "lucide-react";
+import { submitAvatarJob } from "@/lib/api";
 
 const faceDigits = [
   "Front", "Left Profile", "Right Profile", "3/4 Left",
@@ -32,13 +33,27 @@ export default function CreateAvatarPage() {
   const router = useRouter();
   const [facePhotos, setFacePhotos] = useState<Record<string, boolean>>({});
   const [bodyPhotos, setBodyPhotos] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const faceCount = Object.values(facePhotos).filter(Boolean).length;
   const bodyCount = Object.values(bodyPhotos).filter(Boolean).length;
   const canGenerate = faceCount >= 5 && bodyCount >= 4;
 
-  const handleGenerate = () => {
-    router.push("/avatar-generating");
+  const handleGenerate = async () => {
+    if (submitting) return;
+    setSubmitError(null);
+    setSubmitting(true);
+    try {
+      const job = await submitAvatarJob({
+        face_photo_count: faceCount,
+        body_photo_count: bodyCount,
+      });
+      router.push(`/avatar-generating?jobId=${job.id}`);
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "Failed to start avatar generation");
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -187,19 +202,27 @@ export default function CreateAvatarPage() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-4 pt-6 border-t border-gray-200">
+        <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-gray-200">
           <button
             onClick={() => router.push("/talent/dashboard")}
-            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:border-gray-900 hover:text-black transition-colors"
+            disabled={submitting}
+            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:border-gray-900 hover:text-black transition-colors disabled:opacity-50"
           >
             Save Draft
           </button>
           <button
             onClick={handleGenerate}
-            disabled={!canGenerate}
-            className="px-8 py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+            disabled={!canGenerate || submitting}
+            className="px-8 py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            Generate Avatar
+            {submitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Starting…
+              </>
+            ) : (
+              "Generate Avatar"
+            )}
           </button>
           {!canGenerate && (
             <p className="text-xs text-gray-500">
@@ -207,6 +230,11 @@ export default function CreateAvatarPage() {
             </p>
           )}
         </div>
+        {submitError && (
+          <p className="text-xs text-red-600 mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
+            {submitError}
+          </p>
+        )}
 
         <p className="text-xs text-gray-500 text-center mt-4">
           Your avatar will be generated using AI after verification.

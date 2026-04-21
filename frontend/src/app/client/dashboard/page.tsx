@@ -42,6 +42,8 @@ import {
   getClientRequests,
   generateContract,
   createCheckoutSession,
+  postChat,
+  type ChatMessage,
 } from "@/lib/api";
 
 /* ---------- Types ---------- */
@@ -77,7 +79,13 @@ interface ClientRequestItem {
 
 /* ---------- Constants ---------- */
 
-const NAV_TABS = ["Dashboard", "Discover Talent", "Campaigns", "Contracts", "Messages"];
+const NAV_TABS: { label: string; href?: string }[] = [
+  { label: "Dashboard" },
+  { label: "Discover Talent", href: "/discover-talent" },
+  { label: "Campaigns", href: "/campaigns" },
+  { label: "Contracts", href: "/contract-templates" },
+  { label: "Messages" },
+];
 
 const STATUS_BADGE: Record<string, string> = {
   pending: "bg-yellow-50 text-yellow-700",
@@ -170,12 +178,15 @@ export default function ClientDashboardPage() {
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
-  const [chatMessages, setChatMessages] = useState([
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
-      text: "Hello! I can help you find the perfect talent for your campaign. What type of content are you creating?",
+      content:
+        "Hello! I can help you find the perfect talent for your campaign. What type of content are you creating?",
     },
   ]);
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExportToExcel = () => {
@@ -217,26 +228,23 @@ export default function ClientDashboardPage() {
     }
   };
 
-  const handleChatSubmit = () => {
+  const handleChatSubmit = async () => {
     const text = chatMessage.trim();
-    if (!text) return;
-    const userMsg = { role: "user", text };
-    setChatMessages((prev) => [...prev, userMsg]);
+    if (!text || chatSending) return;
+    setChatError(null);
+
+    const next: ChatMessage[] = [...chatMessages, { role: "user" as const, content: text }].slice(-50);
+    setChatMessages(next);
     setChatMessage("");
-    setTimeout(() => {
-      const lower = text.toLowerCase();
-      let reply = "I can help you find talent, generate offers, create contracts, and manage campaigns. What would you like to do?";
-      if (lower.includes("talent") || lower.includes("find") || lower.includes("fashion") || lower.includes("beauty")) {
-        reply = "I found verified talents matching your criteria:\n\n✓ Olga Bonny — Beauty & Fashion\n✓ Emma Clarke — Luxury & Fashion\n✓ Marcus Chen — Sports & Fitness\n\nClick 'View all →' above to browse the full library.";
-      } else if (lower.includes("offer") || lower.includes("budget")) {
-        reply = "To generate an offer I need:\n\n• Campaign name\n• License duration\n• Territory\n• Media channels\n• Budget range\n\nMinimum prices start at £500 for social media.";
-      } else if (lower.includes("contract")) {
-        reply = "I can generate a UK-law compliant contract once you select talent. The contract will cover usage rights, duration, territory, and AI permissions.";
-      } else if (lower.includes("campaign")) {
-        reply = "Campaign ideas for 2026:\n\n✨ Spring fashion launches\n💄 Beauty product reveals\n🏃 Fitness & wellness series\n🌍 Sustainability storytelling\n\nWhich category interests you?";
-      }
-      setChatMessages((prev) => [...prev, { role: "assistant", text: reply }]);
-    }, 700);
+    setChatSending(true);
+    try {
+      const res = await postChat("client", next);
+      setChatMessages((prev) => [...prev, { role: "assistant" as const, content: res.reply }].slice(-50));
+    } catch (e) {
+      setChatError(e instanceof Error ? e.message : "AI assistant unavailable");
+    } finally {
+      setChatSending(false);
+    }
   };
 
   useEffect(() => {
@@ -378,22 +386,33 @@ export default function ClientDashboardPage() {
               </div>
             </Link>
             <div className="hidden md:flex items-center gap-1">
-              {NAV_TABS.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-4 text-sm transition-colors relative ${
-                    activeTab === tab
-                      ? "text-black font-medium"
-                      : "text-gray-500 hover:text-black"
-                  }`}
-                >
-                  {tab}
-                  {activeTab === tab && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-black" />
-                  )}
-                </button>
-              ))}
+              {NAV_TABS.map((tab) => {
+                const active = activeTab === tab.label;
+                const common = `px-3 py-4 text-sm transition-colors relative ${
+                  active ? "text-black font-medium" : "text-gray-500 hover:text-black"
+                }`;
+                const indicator = active && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-black" />
+                );
+                if (tab.href) {
+                  return (
+                    <Link key={tab.label} href={tab.href} className={common}>
+                      {tab.label}
+                      {indicator}
+                    </Link>
+                  );
+                }
+                return (
+                  <button
+                    key={tab.label}
+                    onClick={() => setActiveTab(tab.label)}
+                    className={common}
+                  >
+                    {tab.label}
+                    {indicator}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -506,7 +525,7 @@ export default function ClientDashboardPage() {
                 </Link>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {talents.slice(0, 4).map((t, i) => (
                   <div
                     key={t.id}
@@ -695,19 +714,27 @@ export default function ClientDashboardPage() {
               <div className="bg-black text-white px-4 py-3">
                 <h3 className="text-sm font-medium">AI Campaign Assistant</h3>
               </div>
-              <div className="p-4 h-48 overflow-y-auto space-y-3">
+              <div className="p-4 h-48 sm:h-60 md:h-72 overflow-y-auto space-y-3">
                 {chatMessages.map((msg, i) => (
                   <div
                     key={i}
-                    className={`rounded-lg p-3 text-xs ${
+                    className={`rounded-lg p-3 text-xs whitespace-pre-line ${
                       msg.role === "assistant"
                         ? "bg-gray-50 text-gray-700"
                         : "bg-black text-white ml-4"
                     }`}
                   >
-                    {msg.text}
+                    {msg.content}
                   </div>
                 ))}
+                {chatSending && (
+                  <div className="rounded-lg p-3 text-xs bg-gray-50 text-gray-500 italic">Thinking…</div>
+                )}
+                {chatError && (
+                  <div className="rounded-lg p-3 text-xs bg-red-50 text-red-700 border border-red-200">
+                    {chatError}
+                  </div>
+                )}
               </div>
               <div className="border-t border-gray-200 p-3">
                 <div className="flex items-center gap-2 mb-3">
@@ -717,11 +744,12 @@ export default function ClientDashboardPage() {
                     onChange={(e) => setChatMessage(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleChatSubmit(); } }}
                     placeholder="Ask about talent..."
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    disabled={chatSending}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent disabled:opacity-60"
                   />
                   <button
                     onClick={handleChatSubmit}
-                    disabled={!chatMessage.trim()}
+                    disabled={!chatMessage.trim() || chatSending}
                     className="bg-black text-white p-2 rounded-lg hover:bg-gray-800 transition-colors flex-shrink-0 disabled:opacity-50"
                   >
                     <Send className="w-3 h-3" />
@@ -733,7 +761,8 @@ export default function ClientDashboardPage() {
                       <button
                         key={action}
                         onClick={() => setChatMessage(action)}
-                        className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                        disabled={chatSending}
+                        className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
                       >
                         {action}
                       </button>
