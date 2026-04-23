@@ -90,7 +90,7 @@ export default function HomePage() {
 
           <nav className="hidden md:flex items-center gap-8">
             <Link
-              href="/how-it-works"
+              href="#how-it-works"
               className="text-gray-700 hover:text-black transition-colors"
             >
               How it Works
@@ -244,7 +244,7 @@ export default function HomePage() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white px-6 py-4 space-y-3">
             <Link
-              href="/how-it-works"
+              href="#how-it-works"
               className="block text-gray-700 hover:text-black py-2"
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -467,6 +467,54 @@ export default function HomePage() {
               Get Started
               <ArrowRight className="w-5 h-5" />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== How It Works (process diagram + explainer, inlined from the old /how-it-works page) ===== */}
+      <section id="how-it-works" className="py-16 md:py-20 bg-[#F9FAFB] scroll-mt-20">
+        <div className="max-w-6xl mx-auto px-6 md:px-8">
+          <div className="text-center mb-12">
+            <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">
+              How It Works
+            </p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight">
+              From sign-up to payout, end-to-end
+            </h2>
+            <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
+              How Face Library verifies talent, licenses likenesses, and
+              protects rights at every step.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 p-4 md:p-8 mb-12">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/how-it-works-process.jpeg"
+              alt="Face Library process diagram — from sign-up through verification, licensing, and payout"
+              className="w-full h-auto object-contain rounded-xl"
+            />
+          </div>
+
+          <div className="max-w-3xl mx-auto space-y-5 text-gray-700 leading-relaxed">
+            <p>
+              Every profile starts with <strong>identity verification</strong>{" "}
+              — photos, video, and social account ownership are cross-checked
+              so only the real person can license their own likeness.
+            </p>
+            <p>
+              Once verified, talent upload their <strong>protected digits</strong>{" "}
+              — a structured dataset of face angles, body poses, and short
+              identity videos that becomes the canonical source for every
+              future licensed asset.
+            </p>
+            <p>
+              Talent then set <strong>permissions</strong> (industries,
+              duration, geography, AI training allowed or not). Brands send
+              license requests; talent approve or reject. On approval, a
+              UK-law compliant contract is generated, the brand pays, and
+              funds are released to the talent.
+            </p>
           </div>
         </div>
       </section>

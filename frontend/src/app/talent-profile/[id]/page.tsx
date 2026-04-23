@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, CheckCircle, MapPin, Shield } from "lucide-react";
-import { createLicenseRequest, getTalent } from "@/lib/api";
+import { createLicenseRequest, getTalent, getTalentPricing } from "@/lib/api";
 
 const defaultImages = [
   "https://images.unsplash.com/flagged/photo-1573582677725-863b570e3c00?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
@@ -34,10 +34,22 @@ export default function TalentProfilePage() {
   });
 
   useEffect(() => {
-    getTalent(talentId)
-      .then((t) => {
+    Promise.all([
+      getTalent(talentId),
+      getTalentPricing(talentId).catch(() => ({} as Record<string, number | null | undefined>)),
+    ])
+      .then(([t, realTiers]) => {
         const cats = (t.categories || "").split(",").filter(Boolean);
         const geo = (t.geo_scope || "global").split(",").filter(Boolean);
+        const base = t.min_price_per_use || 500;
+        // Prefer operator-set pricing; otherwise derive from min_price_per_use.
+        const price = (key: "social" | "website" | "print" | "tv", fallbackMult: number, suffix: string) => {
+          const real = (realTiers as Record<string, number | null | undefined>)[key];
+          if (typeof real === "number" && real > 0) {
+            return `£${real.toLocaleString()}${suffix}`;
+          }
+          return `£${Math.round(base * fallbackMult).toLocaleString()}${suffix}`;
+        };
         setTalent({
           name: t.name || t.stage_name || "Unknown",
           image: t.image_url || t.avatar_url || defaultImages[0],
@@ -55,16 +67,15 @@ export default function TalentProfilePage() {
           bio: t.bio || "Digital likeness available for licensed campaigns.",
           portfolio: [t.image_url || defaultImages[0], ...defaultImages.slice(1)],
           pricing: {
-            social: `£${t.min_price_per_use || 500}/month`,
-            website: `£${Math.round((t.min_price_per_use || 500) * 1.6)}/month`,
-            print: `£${Math.round((t.min_price_per_use || 500) * 2.4)}/campaign`,
-            tv: `£${Math.round((t.min_price_per_use || 500) * 5)}/campaign`,
+            social: price("social", 1, "/month"),
+            website: price("website", 1.6, "/month"),
+            print: price("print", 2.4, "/campaign"),
+            tv: price("tv", 5, "/campaign"),
           },
-          min_price: t.min_price_per_use || 100,
+          min_price: base,
         });
       })
       .catch(() => {
-        // Fallback for non-existent IDs
         setTalent(null);
       })
       .finally(() => setLoading(false));

@@ -1932,6 +1932,67 @@ def get_bank_details(current_user: dict = Depends(get_current_user)):
 
 
 # ============================================================================
+# PRICING TIERS (per-surface prices shown on talent profile)
+# ============================================================================
+
+class PricingTiersRequest(BaseModel):
+    social: float | None = Field(None, ge=0, le=1_000_000)
+    website: float | None = Field(None, ge=0, le=1_000_000)
+    print: float | None = Field(None, ge=0, le=1_000_000)
+    tv: float | None = Field(None, ge=0, le=1_000_000)
+
+
+@app.get("/api/talents/{talent_id}/pricing")
+def get_talent_pricing(talent_id: int):
+    """Publicly readable: brands see prices before requesting a license."""
+    res = db().table("talent_profiles").select("pricing_tiers").eq("id", talent_id).limit(1).execute()
+    if not res.data:
+        raise HTTPException(404, "Talent not found")
+    return res.data[0].get("pricing_tiers") or {}
+
+
+@app.post("/api/talents/{talent_id}/pricing")
+def set_talent_pricing(talent_id: int, req: PricingTiersRequest, current_user: dict = Depends(get_current_user)):
+    """Only the talent themselves (or an authorized agent) can set pricing."""
+    talent_res = db().table("talent_profiles").select("user_id").eq("id", talent_id).limit(1).execute()
+    if not talent_res.data:
+        raise HTTPException(404, "Talent not found")
+    talent_user_id = talent_res.data[0]["user_id"]
+
+    is_self = talent_user_id == current_user["user_id"]
+    is_linked_agent = False
+    if current_user["role"] == "agent":
+        agent_pid = _get_user_profile_id(current_user["user_id"], "agent")
+        if agent_pid:
+            link = db().table("talent_agent_links").select("id").eq("agent_id", agent_pid).eq("talent_id", talent_id).execute()
+            is_linked_agent = bool(link.data)
+    if not (is_self or is_linked_agent):
+        raise HTTPException(403, "Only the talent or their linked agent can set pricing")
+
+    payload = req.model_dump(exclude_none=True)
+    db().table("talent_profiles").update({"pricing_tiers": payload}).eq("id", talent_id).execute()
+    return {"ok": True, "pricing_tiers": payload}
+
+
+# ============================================================================
+# AUTH ROLES (multi-role account detection for SelectRole screen)
+# ============================================================================
+
+@app.get("/api/auth/roles")
+def my_roles(current_user: dict = Depends(get_current_user)):
+    """Return every profile the current user has rows in. A single person
+    may act as talent, client (brand), and agent — the SelectRole screen
+    uses this to show a role switcher instead of the new-user role cards."""
+    uid = current_user["user_id"]
+    roles: list[dict] = []
+    for role, table in (("talent", "talent_profiles"), ("client", "client_profiles"), ("agent", "agent_profiles")):
+        res = db().table(table).select("id").eq("user_id", uid).limit(1).execute()
+        if res.data:
+            roles.append({"role": role, "profile_id": res.data[0]["id"]})
+    return {"primary_role": current_user["role"], "roles": roles}
+
+
+# ============================================================================
 # HEALTH (public)
 # ============================================================================
 

@@ -334,3 +334,28 @@ export const updateBankDetails = (data: {
     method: "POST",
     body: JSON.stringify(data),
   });
+
+// Talent pricing tiers (per-surface prices shown on talent profile)
+export interface PricingTiers {
+  social?: number | null;
+  website?: number | null;
+  print?: number | null;
+  tv?: number | null;
+}
+
+export const getTalentPricing = (talentId: number): Promise<PricingTiers> =>
+  fetchAPI(`/api/talents/${talentId}/pricing`);
+
+export const setTalentPricing = (talentId: number, data: PricingTiers) =>
+  fetchAPI(`/api/talents/${talentId}/pricing`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
+// Multi-role detection: which profiles does the current user hold?
+export interface UserRoles {
+  primary_role: string;
+  roles: { role: string; profile_id: number }[];
+}
+
+export const getMyRoles = (): Promise<UserRoles> => fetchAPI("/api/auth/roles");

@@ -19,7 +19,7 @@ export default function ForAgentsPage() {
             <span className="font-semibold text-lg">FACE LIBRARY</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8">
-            <Link href="/how-it-works" className="text-gray-700 hover:text-black transition-colors">How it Works</Link>
+            <Link href="/#how-it-works" className="text-gray-700 hover:text-black transition-colors">How it Works</Link>
             <Link href="/talent/library" className="text-gray-700 hover:text-black transition-colors">Face Library</Link>
             <div className="relative">
               <button onClick={() => setIsForYouOpen(!isForYouOpen)} className="flex items-center gap-1 text-black font-semibold">
@@ -47,7 +47,7 @@ export default function ForAgentsPage() {
         </div>
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white px-6 py-4 space-y-3">
-            <Link href="/how-it-works" className="block text-gray-700 hover:text-black py-2" onClick={() => setMobileMenuOpen(false)}>How it Works</Link>
+            <Link href="/#how-it-works" className="block text-gray-700 hover:text-black py-2" onClick={() => setMobileMenuOpen(false)}>How it Works</Link>
             <Link href="/talent/library" className="block text-gray-700 hover:text-black py-2" onClick={() => setMobileMenuOpen(false)}>Face Library</Link>
             <Link href="/for-talent" className="block text-gray-700 hover:text-black py-2" onClick={() => setMobileMenuOpen(false)}>For Talents</Link>
             <Link href="/for-agents" className="block text-black font-medium py-2" onClick={() => setMobileMenuOpen(false)}>For Agencies</Link>
