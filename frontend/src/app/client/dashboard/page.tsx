@@ -84,7 +84,7 @@ const NAV_TABS: { label: string; href?: string }[] = [
   { label: "Discover Talent", href: "/discover-talent" },
   { label: "Campaigns", href: "/campaigns" },
   { label: "Contracts", href: "/contract-templates" },
-  { label: "Messages" },
+  { label: "Messages", href: "/messages" },
 ];
 
 const STATUS_BADGE: Record<string, string> = {

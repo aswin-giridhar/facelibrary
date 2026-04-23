@@ -38,7 +38,15 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { FloatingAIChat } from "@/components/FloatingAIChat";
-import { getAgent, getAgentRequests, approveLicense, postChat, type ChatMessage } from "@/lib/api";
+import {
+  getAgent,
+  getAgentRequests,
+  approveLicense,
+  postChat,
+  getActivityFeed,
+  type ChatMessage,
+  type ActivityItem,
+} from "@/lib/api";
 
 /* ---------- Types ---------- */
 
@@ -82,6 +90,8 @@ const NAV_TABS: { label: string; href?: string }[] = [
   { label: "Dashboard" },
   { label: "Talent", href: "/discover-talent" },
   { label: "Contracts", href: "/contract-templates" },
+  { label: "Billing", href: "/agent/billing" },
+  { label: "Messages", href: "/messages" },
   { label: "Analytics" },
   { label: "Settings" },
 ];
@@ -103,6 +113,7 @@ export default function AgentDashboardPage() {
   ]);
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
 
   const handleChatSubmit = async () => {
     const text = chatMessage.trim();
@@ -163,12 +174,14 @@ export default function AgentDashboardPage() {
 
   const loadData = async (profileId: number) => {
     try {
-      const [p, r] = await Promise.all([
+      const [p, r, a] = await Promise.all([
         getAgent(profileId),
         getAgentRequests(profileId),
+        getActivityFeed(15).catch(() => [] as ActivityItem[]),
       ]);
       setProfile(p);
       setRequests(r);
+      setActivity(a || []);
     } catch {
       // Profile may not exist yet
     }
@@ -681,11 +694,19 @@ export default function AgentDashboardPage() {
               </div>
             </div>
 
-            {/* Contracts */}
+            {/* Contracts & IP */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">
-                Contracts
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Contracts &amp; IP
+                </h3>
+                <Link
+                  href="/contract-templates"
+                  className="text-xs text-gray-500 hover:text-black"
+                >
+                  View all →
+                </Link>
+              </div>
               {requests.length === 0 ? (
                 <p className="text-sm text-gray-500">No contracts yet.</p>
               ) : (
@@ -693,14 +714,21 @@ export default function AgentDashboardPage() {
                   {requests.slice(0, 4).map((r) => (
                     <div
                       key={r.id}
-                      className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                      className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0"
                     >
-                      <div className="min-w-0">
+                      <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm text-gray-900 truncate">
-                          {r.talent_name}
+                          {r.talent_name}{" "}
+                          <span className="text-gray-400">×</span>{" "}
+                          {r.brand_name}
                         </p>
                         <p className="text-xs text-gray-400">
-                          {r.brand_name}
+                          {r.created_at
+                            ? new Date(r.created_at).toLocaleDateString("en-GB", {
+                                day: "2-digit", month: "short", year: "numeric",
+                              })
+                            : ""}
                         </p>
                       </div>
                       <span
@@ -720,6 +748,61 @@ export default function AgentDashboardPage() {
                 </div>
               )}
             </div>
+
+            {/* Activity */}
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">
+                Activity
+              </h3>
+              {activity.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No recent activity. Approved requests and contract events
+                  will appear here.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {activity.slice(0, 8).map((a) => {
+                    const actionText = a.action
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase());
+                    const isApproval = a.action.includes("approv");
+                    return (
+                      <li key={a.id} className="flex items-start gap-3">
+                        {isApproval ? (
+                          <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                        ) : (
+                          <Clock className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-800 leading-snug">
+                            {actionText}
+                            {a.license_id ? (
+                              <span className="text-gray-500"> #{a.license_id}</span>
+                            ) : null}
+                          </p>
+                          <p className="text-[11px] text-gray-400">
+                            {new Date(a.created_at).toLocaleString("en-GB", {
+                              day: "2-digit",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* Billing & Payouts shortcut */}
+            <Link
+              href="/agent/billing"
+              className="block text-center text-sm bg-black text-white py-3 rounded-xl hover:bg-gray-800 transition-colors"
+            >
+              Billing &amp; Payouts →
+            </Link>
           </div>
         </div>
       </div>
