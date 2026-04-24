@@ -16,15 +16,45 @@ import {
 
 /* ---------- Constants ---------- */
 
+// Reference images lifted directly from the Figma-Make prototype. Shown
+// greyscale behind each upload slot so the user can match pose and framing.
+// Replaced by the user's own photo once an upload completes.
+const REFERENCE_IMAGES: Record<string, string> = {
+  "Front": "https://images.unsplash.com/photo-1770058443069-e384cd001e9b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Left Profile": "https://images.unsplash.com/photo-1612608793250-bc47d93e6178?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Right Profile": "https://images.unsplash.com/photo-1612608793250-bc47d93e6178?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "3/4 Left": "https://images.unsplash.com/photo-1671797022922-71fe999ab2e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "3/4 Right": "https://images.unsplash.com/photo-1671797022922-71fe999ab2e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Head Up": "https://images.unsplash.com/photo-1744850625740-949aee347acd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Head Down": "https://images.unsplash.com/photo-1771620955229-27ba3f21c615?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Neutral": "https://images.unsplash.com/photo-1770058443069-e384cd001e9b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Smile": "https://images.unsplash.com/photo-1676856331403-578aab076208?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Eyes Closed": "https://images.unsplash.com/photo-1582557492456-c53214c03e18?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Eyes Open": "https://images.unsplash.com/photo-1770058443069-e384cd001e9b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Back Head": "https://images.unsplash.com/photo-1707968052131-42fa32a6f46e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Neutral talking": "https://images.unsplash.com/photo-1757495023467-a8263cf26fbe?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Smile talking": "https://images.unsplash.com/photo-1676856331403-578aab076208?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Turn head left/right": "https://images.unsplash.com/photo-1612608793250-bc47d93e6178?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Full Body Front": "https://images.unsplash.com/photo-1636581563760-3d8e2fd6e3ed?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Full Body Left": "https://images.unsplash.com/photo-1754639532963-8a44deaebd87?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Full Body Right": "https://images.unsplash.com/photo-1754639532963-8a44deaebd87?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Full Body Back": "https://images.unsplash.com/photo-1769416945759-4660fd121172?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "3/4 Body Left": "https://images.unsplash.com/photo-1671797022922-71fe999ab2e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "3/4 Body Right": "https://images.unsplash.com/photo-1671797022922-71fe999ab2e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Walking": "https://images.unsplash.com/photo-1636189239307-9f3a701f30a8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Turn 360": "https://images.unsplash.com/photo-1636189239307-9f3a701f30a8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+  "Identity Video": "https://images.unsplash.com/photo-1757495023467-a8263cf26fbe?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
+};
+
 const FACE_DIGITS = [
   "Front", "Left Profile", "Right Profile", "3/4 Left",
   "3/4 Right", "Head Up", "Head Down", "Neutral",
   "Smile", "Eyes Closed", "Eyes Open", "Back Head",
 ];
-const FACE_VIDEOS = ["Neutral Talking", "Smile", "Turn Head"];
+const FACE_VIDEOS = ["Neutral talking", "Smile talking", "Turn head left/right"];
 const BODY_DIGITS = [
-  "Full Body Front", "Left", "Right", "Back",
-  "3/4 Left", "3/4 Right", "Walking", "Turn 360",
+  "Full Body Front", "Full Body Left", "Full Body Right", "Full Body Back",
+  "3/4 Body Left", "3/4 Body Right", "Walking", "Turn 360",
 ];
 const GUIDELINES = [
   { icon: Sun, label: "Natural Lighting" },
@@ -331,11 +361,12 @@ export default function TalentMyFacePage() {
               const url = facePhotos[label];
               const slotKey = `face-${label}`;
               const isUploading = uploadingSlot === slotKey;
+              const reference = REFERENCE_IMAGES[label];
               return (
                 <label
                   key={label}
-                  className={`aspect-square rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 shadow-sm relative overflow-hidden ${
-                    url ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400 bg-white"
+                  className={`aspect-square rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col shadow-sm relative overflow-hidden group ${
+                    url ? "border-green-500" : "border-gray-200 hover:border-gray-400"
                   }`}
                 >
                   <input
@@ -352,21 +383,31 @@ export default function TalentMyFacePage() {
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={url} alt={label} className="absolute inset-0 w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                      <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <Upload className="w-6 h-6 text-white mb-1" />
                         <span className="text-xs text-white">Replace</span>
                       </div>
                       <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-600 bg-white rounded-full" />
                     </>
-                  ) : isUploading ? (
-                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                   ) : (
-                    <Upload className="w-8 h-8 text-gray-400" />
-                  )}
-                  {!url && (
-                    <span className={`${isUploading ? "text-gray-400" : "text-gray-700"} text-sm font-medium text-center px-3 leading-tight`}>
-                      {label}
-                    </span>
+                    <>
+                      {reference && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={reference} alt={`${label} reference`} className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
+                      )}
+                      <div className="absolute inset-0 bg-white/60 group-hover:bg-white/40 transition-colors flex flex-col items-center justify-center gap-2">
+                        {isUploading ? (
+                          <Loader2 className="w-8 h-8 animate-spin text-gray-700" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-white shadow flex items-center justify-center">
+                            <Upload className="w-5 h-5 text-gray-700" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-white/90 text-center py-1.5">
+                        <span className="text-xs font-medium text-gray-800">{label}</span>
+                      </div>
+                    </>
                   )}
                 </label>
               );
@@ -388,11 +429,12 @@ export default function TalentMyFacePage() {
               const url = faceVideos[label];
               const slotKey = `faceVideo-${label}`;
               const isUploading = uploadingSlot === slotKey;
+              const reference = REFERENCE_IMAGES[label];
               return (
                 <label
                   key={label}
-                  className={`aspect-square rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 shadow-sm relative overflow-hidden ${
-                    url ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400 bg-white"
+                  className={`aspect-square rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col shadow-sm relative overflow-hidden group ${
+                    url ? "border-green-500" : "border-gray-200 hover:border-gray-400"
                   }`}
                 >
                   <input
@@ -410,15 +452,25 @@ export default function TalentMyFacePage() {
                       <video src={url} className="absolute inset-0 w-full h-full object-cover" muted playsInline />
                       <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-600 bg-white rounded-full" />
                     </>
-                  ) : isUploading ? (
-                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                   ) : (
-                    <Play className="w-8 h-8 text-gray-400" />
-                  )}
-                  {!url && (
-                    <span className="text-sm font-medium text-gray-700 text-center px-3 leading-tight">
-                      {label}
-                    </span>
+                    <>
+                      {reference && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={reference} alt={`${label} reference`} className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
+                      )}
+                      <div className="absolute inset-0 bg-white/60 group-hover:bg-white/40 transition-colors flex flex-col items-center justify-center gap-2">
+                        {isUploading ? (
+                          <Loader2 className="w-8 h-8 animate-spin text-gray-700" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-black/70 flex items-center justify-center">
+                            <Play className="w-5 h-5 text-white ml-0.5" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-white/90 text-center py-1.5">
+                        <span className="text-xs font-medium text-gray-800">{label}</span>
+                      </div>
+                    </>
                   )}
                 </label>
               );
@@ -442,11 +494,12 @@ export default function TalentMyFacePage() {
               const url = bodyPhotos[label];
               const slotKey = `body-${label}`;
               const isUploading = uploadingSlot === slotKey;
+              const reference = REFERENCE_IMAGES[label];
               return (
                 <label
                   key={label}
-                  className={`aspect-square rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 shadow-sm relative overflow-hidden ${
-                    url ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400 bg-white"
+                  className={`aspect-square rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col shadow-sm relative overflow-hidden group ${
+                    url ? "border-green-500" : "border-gray-200 hover:border-gray-400"
                   }`}
                 >
                   <input
@@ -463,21 +516,31 @@ export default function TalentMyFacePage() {
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={url} alt={label} className="absolute inset-0 w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                      <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <Upload className="w-6 h-6 text-white mb-1" />
                         <span className="text-xs text-white">Replace</span>
                       </div>
                       <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-600 bg-white rounded-full" />
                     </>
-                  ) : isUploading ? (
-                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                   ) : (
-                    <Upload className="w-8 h-8 text-gray-400" />
-                  )}
-                  {!url && (
-                    <span className="text-sm font-medium text-gray-700 text-center px-3 leading-tight">
-                      {label}
-                    </span>
+                    <>
+                      {reference && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={reference} alt={`${label} reference`} className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
+                      )}
+                      <div className="absolute inset-0 bg-white/60 group-hover:bg-white/40 transition-colors flex flex-col items-center justify-center gap-2">
+                        {isUploading ? (
+                          <Loader2 className="w-8 h-8 animate-spin text-gray-700" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-white shadow flex items-center justify-center">
+                            <Upload className="w-5 h-5 text-gray-700" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-white/90 text-center py-1.5">
+                        <span className="text-xs font-medium text-gray-800">{label}</span>
+                      </div>
+                    </>
                   )}
                 </label>
               );
@@ -493,8 +556,8 @@ export default function TalentMyFacePage() {
           </p>
           <div className="max-w-2xl">
             <label
-              className={`aspect-video rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-4 shadow-sm p-8 relative overflow-hidden ${
-                identityVideo ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400 bg-white"
+              className={`aspect-video rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col shadow-sm relative overflow-hidden group ${
+                identityVideo ? "border-green-500" : "border-gray-200 hover:border-gray-400"
               }`}
             >
               <input
@@ -512,18 +575,29 @@ export default function TalentMyFacePage() {
                   <video src={identityVideo} className="absolute inset-0 w-full h-full object-cover" muted playsInline controls />
                   <CheckCircle className="absolute top-3 right-3 w-6 h-6 text-green-600 bg-white rounded-full" />
                 </>
-              ) : uploadingSlot === "identity" ? (
-                <Loader2 className="w-12 h-12 animate-spin text-gray-400" />
               ) : (
                 <>
-                  <Upload className="w-12 h-12 text-gray-400" />
-                  <div className="text-center">
-                    <p className="text-lg font-semibold text-gray-700 mb-3">Upload Video</p>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <p>Example script:</p>
-                      <p className="italic">&ldquo;Hello, my name is...&rdquo;</p>
-                      <p className="italic">&ldquo;I am from...&rdquo;</p>
-                      <p className="italic">&ldquo;This video confirms my identity.&rdquo;</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={REFERENCE_IMAGES["Identity Video"]}
+                    alt="Identity video reference"
+                    className="absolute inset-0 w-full h-full object-cover grayscale opacity-60"
+                  />
+                  <div className="absolute inset-0 bg-white/70 group-hover:bg-white/50 transition-colors flex flex-col items-center justify-center gap-4 p-8">
+                    {uploadingSlot === "identity" ? (
+                      <Loader2 className="w-12 h-12 animate-spin text-gray-700" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-black/80 flex items-center justify-center">
+                        <Play className="w-7 h-7 text-white ml-1" />
+                      </div>
+                    )}
+                    <div className="text-center">
+                      <p className="text-lg font-semibold text-gray-900 mb-3">Upload Identity Video</p>
+                      <div className="text-sm text-gray-700 space-y-1">
+                        <p className="italic">&ldquo;Hello, my name is...&rdquo;</p>
+                        <p className="italic">&ldquo;I am from...&rdquo;</p>
+                        <p className="italic">&ldquo;This video confirms my identity.&rdquo;</p>
+                      </div>
                     </div>
                   </div>
                 </>
