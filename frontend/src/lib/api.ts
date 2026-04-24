@@ -220,11 +220,64 @@ export const submitAvatarJob = (data: {
   face_photo_count: number;
   body_photo_count: number;
   identity_video_ref?: string;
+  face_photo_urls?: string[];
+  face_video_urls?: string[];
+  body_photo_urls?: string[];
+  identity_video_url?: string;
 }) =>
   fetchAPI("/api/talent/avatar/submit", {
     method: "POST",
     body: JSON.stringify(data),
   });
+
+// File uploads (avatar photos, portfolio images, identity video).
+// Returns { url, path, size }. Pass the returned URL into submitAvatarJob /
+// setTalentPortfolio to persist it.
+export async function uploadPhoto(
+  file: File,
+  opts: { purpose?: "avatar" | "portfolio"; slot?: string } = {}
+): Promise<{ url: string; path: string; size: number }> {
+  const token = getToken();
+  const fd = new FormData();
+  fd.append("file", file);
+  const qs = new URLSearchParams({
+    purpose: opts.purpose || "avatar",
+    ...(opts.slot ? { slot: opts.slot } : {}),
+  });
+  const res = await fetch(`${API_BASE}/api/uploads/photo?${qs.toString()}`, {
+    method: "POST",
+    body: fd,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Upload failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+// Talent portfolio
+export const getTalentPortfolio = (talentId: number): Promise<string[]> =>
+  fetchAPI(`/api/talents/${talentId}/portfolio`);
+
+export const setTalentPortfolio = (talentId: number, images: string[]) =>
+  fetchAPI(`/api/talents/${talentId}/portfolio`, {
+    method: "POST",
+    body: JSON.stringify({ images }),
+  });
+
+// Contract signing
+export interface ContractStatus {
+  has_contract: boolean;
+  is_signed: boolean;
+  signed_at: string | null;
+  contract_id?: number;
+}
+export const getContractStatus = (licenseId: number): Promise<ContractStatus> =>
+  fetchAPI(`/api/licensing/${licenseId}/contract-status`);
+
+export const signContract = (licenseId: number) =>
+  fetchAPI(`/api/licensing/${licenseId}/sign`, { method: "POST" });
 
 export const getAvatarJob = (jobId: number) =>
   fetchAPI(`/api/talent/avatar/${jobId}`);

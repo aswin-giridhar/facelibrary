@@ -41,6 +41,7 @@ import {
   createLicenseRequest,
   getClientRequests,
   generateContract,
+  signContract,
   createCheckoutSession,
   postChat,
   type ChatMessage,
@@ -72,7 +73,8 @@ interface ClientRequestItem {
   desired_duration_days: number;
   desired_regions: string | null;
   proposed_price: number | null;
-  has_contract: boolean;
+  has_contract?: boolean;
+  contract_generated?: boolean;
   payment_status: string | null;
   created_at: string;
 }
@@ -174,6 +176,7 @@ export default function ClientDashboardPage() {
   const [selectedTalents, setSelectedTalents] = useState<number[]>([]);
   const [message, setMessage] = useState("");
   const [generatingId, setGeneratingId] = useState<number | null>(null);
+  const [signingId, setSigningId] = useState<number | null>(null);
   const [payingId, setPayingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [chatOpen, setChatOpen] = useState(false);
@@ -291,12 +294,24 @@ export default function ClientDashboardPage() {
     setGeneratingId(licenseId);
     try {
       await generateContract(licenseId);
-      setMessage("Contract generated successfully.");
+      setMessage("Contract generated. Review and sign to proceed.");
       findAndLoadData();
     } catch {
       setMessage("Failed to generate contract.");
     }
     setGeneratingId(null);
+  };
+
+  const handleSignContract = async (licenseId: number) => {
+    setSigningId(licenseId);
+    try {
+      await signContract(licenseId);
+      setMessage("Contract signed. You can now pay to activate the license.");
+      findAndLoadData();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Failed to sign contract.");
+    }
+    setSigningId(null);
   };
 
   const handlePay = async (licenseId: number) => {
@@ -669,25 +684,39 @@ export default function ClientDashboardPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                        <button
-                          onClick={() => handleGenerateContract(r.id)}
-                          disabled={generatingId === r.id}
-                          className="flex items-center gap-1 text-xs bg-black text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          {generatingId === r.id ? "..." : "Sign"}
-                        </button>
-                        {(r.status === "approved" || r.status === "active") &&
-                          r.payment_status !== "paid" && (
-                            <button
-                              onClick={() => handlePay(r.id)}
-                              disabled={payingId === r.id}
-                              className="flex items-center gap-1 text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                            >
-                              <CreditCard className="w-3.5 h-3.5" />
-                              {payingId === r.id ? "..." : "Pay"}
-                            </button>
-                          )}
+                        {/* 1) Generate contract — only if the talent approved AND no contract exists yet */}
+                        {r.status === "approved" && !r.contract_generated && (
+                          <button
+                            onClick={() => handleGenerateContract(r.id)}
+                            disabled={generatingId === r.id}
+                            className="flex items-center gap-1 text-xs bg-black text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            {generatingId === r.id ? "Generating…" : "Generate Contract"}
+                          </button>
+                        )}
+                        {/* 2) Sign contract — only once a contract exists and before payment */}
+                        {r.contract_generated && r.status !== "active" && r.payment_status !== "paid" && (
+                          <button
+                            onClick={() => handleSignContract(r.id)}
+                            disabled={signingId === r.id}
+                            className="flex items-center gap-1 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            {signingId === r.id ? "Signing…" : "Sign Contract"}
+                          </button>
+                        )}
+                        {/* 3) Pay — after signing, status flips to active */}
+                        {(r.status === "active") && r.payment_status !== "paid" && (
+                          <button
+                            onClick={() => handlePay(r.id)}
+                            disabled={payingId === r.id}
+                            className="flex items-center gap-1 text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                          >
+                            <CreditCard className="w-3.5 h-3.5" />
+                            {payingId === r.id ? "…" : "Pay"}
+                          </button>
+                        )}
                         {r.payment_status === "paid" && (
                           <span className="text-xs text-emerald-600 font-medium px-2 py-1">
                             Paid
@@ -828,23 +857,36 @@ export default function ClientDashboardPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <button
-                          onClick={() => handleGenerateContract(r.id)}
-                          disabled={generatingId === r.id}
-                          className="text-xs bg-black text-white px-2.5 py-1 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
-                        >
-                          Sign
-                        </button>
-                        {(r.status === "approved" || r.status === "active") &&
-                          r.payment_status !== "paid" && (
-                            <button
-                              onClick={() => handlePay(r.id)}
-                              disabled={payingId === r.id}
-                              className="text-xs bg-green-600 text-white px-2.5 py-1 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                            >
-                              Pay
-                            </button>
-                          )}
+                        {r.status === "approved" && !r.contract_generated && (
+                          <button
+                            onClick={() => handleGenerateContract(r.id)}
+                            disabled={generatingId === r.id}
+                            className="text-xs bg-black text-white px-2.5 py-1 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                          >
+                            Generate
+                          </button>
+                        )}
+                        {r.contract_generated && r.status !== "active" && r.payment_status !== "paid" && (
+                          <button
+                            onClick={() => handleSignContract(r.id)}
+                            disabled={signingId === r.id}
+                            className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          >
+                            Sign
+                          </button>
+                        )}
+                        {r.status === "active" && r.payment_status !== "paid" && (
+                          <button
+                            onClick={() => handlePay(r.id)}
+                            disabled={payingId === r.id}
+                            className="text-xs bg-green-600 text-white px-2.5 py-1 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                          >
+                            Pay
+                          </button>
+                        )}
+                        {r.payment_status === "paid" && (
+                          <span className="text-[10px] text-emerald-600 font-medium">Paid</span>
+                        )}
                       </div>
                     </div>
                   ))}

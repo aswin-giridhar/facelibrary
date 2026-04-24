@@ -4,13 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, CheckCircle, MapPin, Shield } from "lucide-react";
-import { createLicenseRequest, getTalent, getTalentPricing } from "@/lib/api";
+import { createLicenseRequest, getTalent, getTalentPricing, getTalentPortfolio } from "@/lib/api";
 
-const defaultImages = [
-  "https://images.unsplash.com/flagged/photo-1573582677725-863b570e3c00?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
-  "https://images.unsplash.com/photo-1654028859265-0e8b12a67aae?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
-  "https://images.unsplash.com/photo-1633419798503-0b0c628f267c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
-];
+// Hero placeholder used only when the talent hasn't uploaded a profile photo.
+// Portfolio images now come from /api/talents/:id/portfolio; no more fakes.
+const HERO_PLACEHOLDER =
+  "https://images.unsplash.com/flagged/photo-1573582677725-863b570e3c00?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600";
 
 export default function TalentProfilePage() {
   const router = useRouter();
@@ -37,8 +36,9 @@ export default function TalentProfilePage() {
     Promise.all([
       getTalent(talentId),
       getTalentPricing(talentId).catch(() => ({} as Record<string, number | null | undefined>)),
+      getTalentPortfolio(talentId).catch(() => [] as string[]),
     ])
-      .then(([t, realTiers]) => {
+      .then(([t, realTiers, realPortfolio]) => {
         const cats = (t.categories || "").split(",").filter(Boolean);
         const geo = (t.geo_scope || "global").split(",").filter(Boolean);
         const base = t.min_price_per_use || 500;
@@ -52,7 +52,7 @@ export default function TalentProfilePage() {
         };
         setTalent({
           name: t.name || t.stage_name || "Unknown",
-          image: t.image_url || t.avatar_url || defaultImages[0],
+          image: t.image_url || t.avatar_url || HERO_PLACEHOLDER,
           faceId: `FL-${String(t.id).padStart(6, "0")}`,
           gender: t.gender || "Not specified",
           age: t.age || 0,
@@ -65,7 +65,11 @@ export default function TalentProfilePage() {
             ...(t.allow_ai_training ? ["AI Training"] : []),
           ],
           bio: t.bio || "Digital likeness available for licensed campaigns.",
-          portfolio: [t.image_url || defaultImages[0], ...defaultImages.slice(1)],
+          // Prefer operator-set portfolio; fall back to the profile image only
+          // (no more Unsplash stand-ins — empty slots are honest signal).
+          portfolio: (Array.isArray(realPortfolio) && realPortfolio.length > 0
+            ? realPortfolio.slice(0, 3)
+            : t.image_url ? [t.image_url] : []),
           pricing: {
             social: price("social", 1, "/month"),
             website: price("website", 1.6, "/month"),
@@ -199,17 +203,24 @@ export default function TalentProfilePage() {
 
         <div className="mb-10">
           <h2 className="text-2xl font-semibold mb-6">Portfolio</h2>
-          <div className="grid grid-cols-3 gap-6">
-            {talent.portfolio.map((img, i) => (
-              <div key={i} className="relative aspect-[3/4] bg-white rounded-xl overflow-hidden border border-gray-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img} alt={`Portfolio ${i + 1}`} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="text-white/20 text-2xl font-bold tracking-wider -rotate-12">FACE LIBRARY</div>
+          {talent.portfolio.length === 0 ? (
+            <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl py-12 text-center text-sm text-gray-500">
+              No portfolio images yet. The talent hasn&apos;t published any showcase
+              photos.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {talent.portfolio.map((img, i) => (
+                <div key={i} className="relative aspect-[3/4] bg-white rounded-xl overflow-hidden border border-gray-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img} alt={`Portfolio ${i + 1}`} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="text-white/20 text-2xl font-bold tracking-wider -rotate-12">FACE LIBRARY</div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-gray-50 rounded-xl p-8">

@@ -9,7 +9,10 @@ import {
   Shield, Play,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { getTalent, listTalents, submitAvatarJob } from "@/lib/api";
+import {
+  getTalent, listTalents, submitAvatarJob, uploadPhoto,
+  getTalentPortfolio, setTalentPortfolio,
+} from "@/lib/api";
 
 /* ---------- Constants ---------- */
 
@@ -60,12 +63,18 @@ export default function TalentMyFacePage() {
 
   const [profile, setProfile] = useState<TalentProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [facePhotos, setFacePhotos] = useState<Record<string, File | null>>({});
-  const [faceVideos, setFaceVideos] = useState<Record<string, File | null>>({});
-  const [bodyPhotos, setBodyPhotos] = useState<Record<string, File | null>>({});
-  const [identityVideo, setIdentityVideo] = useState<File | null>(null);
+  // Each slot holds the uploaded public URL (or null if not yet uploaded).
+  const [facePhotos, setFacePhotos] = useState<Record<string, string | null>>({});
+  const [faceVideos, setFaceVideos] = useState<Record<string, string | null>>({});
+  const [bodyPhotos, setBodyPhotos] = useState<Record<string, string | null>>({});
+  const [identityVideo, setIdentityVideo] = useState<string | null>(null);
+  const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Portfolio (3-slot showcase shown on /talent-profile/{id})
+  const [portfolio, setPortfolio] = useState<(string | null)[]>([null, null, null]);
+  const [portfolioSaving, setPortfolioSaving] = useState(false);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "talent")) {
@@ -83,6 +92,12 @@ export default function TalentMyFacePage() {
           p = ts.find((t) => t.user_id === user.user_id) ?? null;
         }
         setProfile(p);
+        if (p) {
+          const existing = await getTalentPortfolio(p.id).catch(() => [] as string[]);
+          const padded: (string | null)[] = [null, null, null];
+          existing.slice(0, 3).forEach((u, i) => { padded[i] = u; });
+          setPortfolio(padded);
+        }
       } finally {
         setLoading(false);
       }
@@ -94,14 +109,38 @@ export default function TalentMyFacePage() {
   const bodyCount = Object.values(bodyPhotos).filter(Boolean).length;
   const canGenerate = faceCount >= 5 && bodyCount >= 4;
 
+  async function uploadSlot(
+    slotKey: string,
+    file: File,
+    onDone: (url: string) => void
+  ) {
+    setError(null);
+    setUploadingSlot(slotKey);
+    try {
+      const { url } = await uploadPhoto(file, { purpose: "avatar", slot: slotKey });
+      onDone(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploadingSlot(null);
+    }
+  }
+
   const handleGenerate = async () => {
     if (submitting) return;
     setError(null);
     setSubmitting(true);
     try {
+      const face_photo_urls = Object.values(facePhotos).filter((u): u is string => Boolean(u));
+      const face_video_urls = Object.values(faceVideos).filter((u): u is string => Boolean(u));
+      const body_photo_urls = Object.values(bodyPhotos).filter((u): u is string => Boolean(u));
       const job = await submitAvatarJob({
         face_photo_count: faceCount,
         body_photo_count: bodyCount,
+        face_photo_urls,
+        face_video_urls,
+        body_photo_urls,
+        identity_video_url: identityVideo || undefined,
       });
       router.push(`/avatar-generating?jobId=${job.id}`);
     } catch (e) {
@@ -109,6 +148,36 @@ export default function TalentMyFacePage() {
       setSubmitting(false);
     }
   };
+
+  async function handlePortfolioUpload(idx: number, file: File) {
+    if (!profile) return;
+    setError(null);
+    setUploadingSlot(`portfolio-${idx}`);
+    try {
+      const { url } = await uploadPhoto(file, { purpose: "portfolio", slot: `portfolio${idx}` });
+      const next = [...portfolio];
+      next[idx] = url;
+      setPortfolio(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Portfolio upload failed");
+    } finally {
+      setUploadingSlot(null);
+    }
+  }
+
+  async function handlePortfolioSave() {
+    if (!profile) return;
+    setError(null);
+    setPortfolioSaving(true);
+    try {
+      const urls = portfolio.filter((u): u is string => Boolean(u));
+      await setTalentPortfolio(profile.id, urls);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save portfolio");
+    } finally {
+      setPortfolioSaving(false);
+    }
+  }
 
   if (authLoading || loading) {
     return (
@@ -259,31 +328,46 @@ export default function TalentMyFacePage() {
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {FACE_DIGITS.map((label) => {
-              const isUploaded = Boolean(facePhotos[label]);
+              const url = facePhotos[label];
+              const slotKey = `face-${label}`;
+              const isUploading = uploadingSlot === slotKey;
               return (
                 <label
                   key={label}
-                  className={`aspect-square bg-white rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 shadow-sm relative ${
-                    isUploaded ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400"
+                  className={`aspect-square rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 shadow-sm relative overflow-hidden ${
+                    url ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400 bg-white"
                   }`}
                 >
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
+                    disabled={isUploading}
                     onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      setFacePhotos((prev) => ({ ...prev, [label]: file }));
+                      const file = e.target.files?.[0];
+                      if (file) uploadSlot(slotKey, file, (url) => setFacePhotos((p) => ({ ...p, [label]: url })));
                     }}
                   />
-                  {isUploaded ? (
-                    <CheckCircle className="w-10 h-10 text-green-600" />
+                  {url ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={label} className="absolute inset-0 w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <Upload className="w-6 h-6 text-white mb-1" />
+                        <span className="text-xs text-white">Replace</span>
+                      </div>
+                      <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-600 bg-white rounded-full" />
+                    </>
+                  ) : isUploading ? (
+                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                   ) : (
                     <Upload className="w-8 h-8 text-gray-400" />
                   )}
-                  <span className="text-sm font-medium text-gray-700 text-center px-3 leading-tight">
-                    {label}
-                  </span>
+                  {!url && (
+                    <span className={`${isUploading ? "text-gray-400" : "text-gray-700"} text-sm font-medium text-center px-3 leading-tight`}>
+                      {label}
+                    </span>
+                  )}
                 </label>
               );
             })}
@@ -301,31 +385,41 @@ export default function TalentMyFacePage() {
           <p className="text-sm text-gray-600 mb-6">Short face video clips.</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {FACE_VIDEOS.map((label) => {
-              const isUploaded = Boolean(faceVideos[label]);
+              const url = faceVideos[label];
+              const slotKey = `faceVideo-${label}`;
+              const isUploading = uploadingSlot === slotKey;
               return (
                 <label
                   key={label}
-                  className={`aspect-square bg-white rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 shadow-sm ${
-                    isUploaded ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400"
+                  className={`aspect-square rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 shadow-sm relative overflow-hidden ${
+                    url ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400 bg-white"
                   }`}
                 >
                   <input
                     type="file"
                     accept="video/*"
                     className="hidden"
+                    disabled={isUploading}
                     onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      setFaceVideos((prev) => ({ ...prev, [label]: file }));
+                      const file = e.target.files?.[0];
+                      if (file) uploadSlot(slotKey, file, (url) => setFaceVideos((p) => ({ ...p, [label]: url })));
                     }}
                   />
-                  {isUploaded ? (
-                    <CheckCircle className="w-10 h-10 text-green-600" />
+                  {url ? (
+                    <>
+                      <video src={url} className="absolute inset-0 w-full h-full object-cover" muted playsInline />
+                      <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-600 bg-white rounded-full" />
+                    </>
+                  ) : isUploading ? (
+                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                   ) : (
                     <Play className="w-8 h-8 text-gray-400" />
                   )}
-                  <span className="text-sm font-medium text-gray-700 text-center px-3 leading-tight">
-                    {label}
-                  </span>
+                  {!url && (
+                    <span className="text-sm font-medium text-gray-700 text-center px-3 leading-tight">
+                      {label}
+                    </span>
+                  )}
                 </label>
               );
             })}
@@ -345,31 +439,46 @@ export default function TalentMyFacePage() {
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {BODY_DIGITS.map((label) => {
-              const isUploaded = Boolean(bodyPhotos[label]);
+              const url = bodyPhotos[label];
+              const slotKey = `body-${label}`;
+              const isUploading = uploadingSlot === slotKey;
               return (
                 <label
                   key={label}
-                  className={`aspect-square bg-white rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 shadow-sm ${
-                    isUploaded ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400"
+                  className={`aspect-square rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 shadow-sm relative overflow-hidden ${
+                    url ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400 bg-white"
                   }`}
                 >
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
+                    disabled={isUploading}
                     onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      setBodyPhotos((prev) => ({ ...prev, [label]: file }));
+                      const file = e.target.files?.[0];
+                      if (file) uploadSlot(slotKey, file, (url) => setBodyPhotos((p) => ({ ...p, [label]: url })));
                     }}
                   />
-                  {isUploaded ? (
-                    <CheckCircle className="w-10 h-10 text-green-600" />
+                  {url ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={label} className="absolute inset-0 w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <Upload className="w-6 h-6 text-white mb-1" />
+                        <span className="text-xs text-white">Replace</span>
+                      </div>
+                      <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-600 bg-white rounded-full" />
+                    </>
+                  ) : isUploading ? (
+                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                   ) : (
                     <Upload className="w-8 h-8 text-gray-400" />
                   )}
-                  <span className="text-sm font-medium text-gray-700 text-center px-3 leading-tight">
-                    {label}
-                  </span>
+                  {!url && (
+                    <span className="text-sm font-medium text-gray-700 text-center px-3 leading-tight">
+                      {label}
+                    </span>
+                  )}
                 </label>
               );
             })}
@@ -384,27 +493,32 @@ export default function TalentMyFacePage() {
           </p>
           <div className="max-w-2xl">
             <label
-              className={`aspect-video bg-white rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-4 shadow-sm p-8 ${
-                identityVideo ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400"
+              className={`aspect-video rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-4 shadow-sm p-8 relative overflow-hidden ${
+                identityVideo ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400 bg-white"
               }`}
             >
               <input
                 type="file"
                 accept="video/*"
                 className="hidden"
-                onChange={(e) => setIdentityVideo(e.target.files?.[0] || null)}
+                disabled={uploadingSlot === "identity"}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadSlot("identity", file, (url) => setIdentityVideo(url));
+                }}
               />
               {identityVideo ? (
                 <>
-                  <CheckCircle className="w-12 h-12 text-green-600" />
-                  <p className="text-lg font-semibold text-green-700">{identityVideo.name}</p>
-                  <p className="text-xs text-gray-500">Click to replace</p>
+                  <video src={identityVideo} className="absolute inset-0 w-full h-full object-cover" muted playsInline controls />
+                  <CheckCircle className="absolute top-3 right-3 w-6 h-6 text-green-600 bg-white rounded-full" />
                 </>
+              ) : uploadingSlot === "identity" ? (
+                <Loader2 className="w-12 h-12 animate-spin text-gray-400" />
               ) : (
                 <>
                   <Upload className="w-12 h-12 text-gray-400" />
                   <div className="text-center">
-                    <p className="text-lg font-semibold text-gray-700 mb-3">Record Video</p>
+                    <p className="text-lg font-semibold text-gray-700 mb-3">Upload Video</p>
                     <div className="text-sm text-gray-600 space-y-1">
                       <p>Example script:</p>
                       <p className="italic">&ldquo;Hello, my name is...&rdquo;</p>
@@ -415,6 +529,79 @@ export default function TalentMyFacePage() {
                 </>
               )}
             </label>
+          </div>
+        </section>
+
+        {/* Portfolio — public showcase on /talent-profile/{id} */}
+        <section className="mb-12">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-xl font-semibold">Portfolio</h2>
+            <span className="text-sm text-gray-500">
+              {portfolio.filter(Boolean).length}/3 uploaded
+            </span>
+          </div>
+          <p className="text-sm text-gray-600 mb-6">
+            Three portfolio images shown publicly on your profile. Brands see
+            these before sending license requests — pick your strongest shots.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl">
+            {[0, 1, 2].map((idx) => {
+              const url = portfolio[idx];
+              const slotKey = `portfolio-${idx}`;
+              const isUploading = uploadingSlot === slotKey;
+              return (
+                <label
+                  key={idx}
+                  className={`aspect-[3/4] rounded-2xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 shadow-sm relative overflow-hidden ${
+                    url ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-gray-400 bg-white"
+                  }`}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={isUploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handlePortfolioUpload(idx, file);
+                    }}
+                  />
+                  {url ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Portfolio ${idx + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                        <div className="text-white/20 text-xl font-bold tracking-wider -rotate-12">FACE LIBRARY</div>
+                      </div>
+                      <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <Upload className="w-6 h-6 text-white mb-1" />
+                        <span className="text-xs text-white">Replace</span>
+                      </div>
+                    </>
+                  ) : isUploading ? (
+                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-700">Portfolio {idx + 1}</span>
+                    </>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+          <div className="mt-4">
+            <button
+              onClick={handlePortfolioSave}
+              disabled={portfolioSaving || portfolio.every((x) => !x)}
+              className="inline-flex items-center gap-2 bg-black text-white px-5 py-2 rounded-lg text-sm hover:bg-gray-800 disabled:opacity-50"
+            >
+              {portfolioSaving ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+              ) : (
+                "Save Portfolio"
+              )}
+            </button>
           </div>
         </section>
 

@@ -1476,6 +1476,10 @@ class AvatarSubmitRequest(BaseModel):
     face_photo_count: int = Field(..., ge=0, le=50)
     body_photo_count: int = Field(..., ge=0, le=50)
     identity_video_ref: str | None = Field(None, max_length=500)
+    face_photo_urls: list[str] = Field(default_factory=list)
+    face_video_urls: list[str] = Field(default_factory=list)
+    body_photo_urls: list[str] = Field(default_factory=list)
+    identity_video_url: str | None = None
 
 
 def _maybe_complete_avatar_job(job: dict) -> dict:
@@ -1532,12 +1536,17 @@ def submit_avatar_job(req: AvatarSubmitRequest, request: Request, current_user: 
         "talent_id": talent_pid, "status": "processing",
         "face_photo_count": req.face_photo_count,
         "body_photo_count": req.body_photo_count,
-        "identity_video_ref": req.identity_video_ref,
+        "identity_video_ref": req.identity_video_ref or req.identity_video_url,
+        "face_photo_urls": req.face_photo_urls,
+        "face_video_urls": req.face_video_urls,
+        "body_photo_urls": req.body_photo_urls,
+        "identity_video_url": req.identity_video_url,
     }).execute()
     job = res.data[0]
     _log_audit(None, "avatar_pipeline", "avatar_job_started",
                f"Talent {talent_pid} submitted avatar job id={job['id']} "
-               f"(faces={req.face_photo_count}, bodies={req.body_photo_count})")
+               f"(faces={req.face_photo_count}, bodies={req.body_photo_count}, "
+               f"urls={len(req.face_photo_urls) + len(req.body_photo_urls)})")
     return job
 
 
@@ -1929,6 +1938,190 @@ def get_bank_details(current_user: dict = Depends(get_current_user)):
         return None
     res = db().table(table).select("bank_account_details").eq("id", profile_id).limit(1).execute()
     return (res.data or [{}])[0].get("bank_account_details")
+
+
+# ============================================================================
+# FILE UPLOADS (avatar photos/videos + portfolio photos via Supabase Storage)
+# ============================================================================
+
+AVATAR_BUCKET = "avatar-uploads"
+ALLOWED_UPLOAD_MIMES = {
+    "image/jpeg", "image/png", "image/webp",
+    "video/mp4", "video/webm", "video/quicktime",
+}
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20MB
+
+
+@app.post("/api/uploads/photo")
+@limiter.limit("60/minute")
+async def upload_photo(
+    request: Request,
+    file: UploadFile = File(...),
+    purpose: str = "avatar",
+    slot: str | None = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload a photo or short video to the `avatar-uploads` bucket.
+    Callable by any authenticated user; the returned URL is included in
+    an avatar_jobs or talent_profiles.portfolio_images record afterwards.
+
+    Query params:
+    - purpose: "avatar" | "portfolio" (only used in the storage path prefix)
+    - slot: optional label (e.g. "Front", "Left Profile") for human-readable filenames
+
+    Enforces: content_type allowlist, 20MB size cap, per-user path namespacing.
+    """
+    if not file.content_type or file.content_type not in ALLOWED_UPLOAD_MIMES:
+        raise HTTPException(400, f"Unsupported content type: {file.content_type}")
+    if purpose not in ("avatar", "portfolio"):
+        raise HTTPException(400, "purpose must be 'avatar' or 'portfolio'")
+
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(400, f"File too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)}MB)")
+
+    ext_map = {
+        "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+        "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
+    }
+    ext = ext_map.get(file.content_type, "bin")
+    safe_slot = "".join(c for c in (slot or "") if c.isalnum() or c in "-_") or "upload"
+    object_path = f"{purpose}/{current_user['user_id']}/{safe_slot}_{uuid.uuid4().hex[:8]}.{ext}"
+
+    try:
+        db().storage.from_(AVATAR_BUCKET).upload(
+            object_path,
+            contents,
+            {"content-type": file.content_type, "upsert": "false"},
+        )
+    except Exception as e:
+        logger.error("upload to %s failed: %s", AVATAR_BUCKET, e)
+        raise HTTPException(502, "Storage is temporarily unavailable. Please try again.")
+
+    public_url = f"{os.getenv('SUPABASE_URL')}/storage/v1/object/public/{AVATAR_BUCKET}/{object_path}"
+    return {"url": public_url, "path": object_path, "size": len(contents)}
+
+
+# ============================================================================
+# PORTFOLIO IMAGES (talent's public showcase — shown on /talent-profile/{id})
+# ============================================================================
+
+class PortfolioUpdateRequest(BaseModel):
+    images: list[str] = Field(..., max_length=10)
+
+
+@app.get("/api/talents/{talent_id}/portfolio")
+def get_talent_portfolio(talent_id: int):
+    """Public: the portfolio images rendered on the talent profile page."""
+    res = db().table("talent_profiles").select("portfolio_images").eq("id", talent_id).limit(1).execute()
+    if not res.data:
+        raise HTTPException(404, "Talent not found")
+    return res.data[0].get("portfolio_images") or []
+
+
+@app.post("/api/talents/{talent_id}/portfolio")
+def set_talent_portfolio(
+    talent_id: int,
+    req: PortfolioUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Only the talent (or a linked agent) can replace the portfolio list."""
+    talent_res = db().table("talent_profiles").select("user_id").eq("id", talent_id).limit(1).execute()
+    if not talent_res.data:
+        raise HTTPException(404, "Talent not found")
+    talent_user_id = talent_res.data[0]["user_id"]
+
+    is_self = talent_user_id == current_user["user_id"]
+    is_linked_agent = False
+    if current_user["role"] == "agent":
+        agent_pid = _get_user_profile_id(current_user["user_id"], "agent")
+        if agent_pid:
+            link = db().table("talent_agent_links").select("id").eq("agent_id", agent_pid).eq("talent_id", talent_id).execute()
+            is_linked_agent = bool(link.data)
+    if not (is_self or is_linked_agent):
+        raise HTTPException(403, "Only the talent or their linked agent can edit the portfolio")
+
+    # Basic sanity check: URLs only, each under 1KB.
+    for u in req.images:
+        if not (u.startswith("http://") or u.startswith("https://")) or len(u) > 1024:
+            raise HTTPException(400, "Each image must be a valid http(s) URL")
+
+    db().table("talent_profiles").update({"portfolio_images": req.images}).eq("id", talent_id).execute()
+    return {"ok": True, "images": req.images}
+
+
+# ============================================================================
+# CONTRACT SIGNING (separate from generate — enables real brand sign-off)
+# ============================================================================
+
+@app.post("/api/licensing/{license_id}/sign")
+def sign_contract(license_id: int, current_user: dict = Depends(get_current_user)):
+    """Brand signs the generated contract. Idempotent per license.
+    Preconditions: contract must exist (generate-contract has been called),
+    the caller must be the client who requested the license."""
+    lic_res = db().table("license_requests").select("*").eq("id", license_id).limit(1).execute()
+    if not lic_res.data:
+        raise HTTPException(404, "License not found")
+    lic = lic_res.data[0]
+
+    # Only the requesting client may sign.
+    client_pid = _get_user_profile_id(current_user["user_id"], "client")
+    if not client_pid or client_pid != lic["client_id"]:
+        raise HTTPException(403, "Only the brand who requested this license can sign")
+
+    contract_res = db().table("contracts").select("*").eq("license_id", license_id).order("created_at", desc=True).limit(1).execute()
+    if not contract_res.data:
+        raise HTTPException(400, "No contract has been generated yet. Generate the contract before signing.")
+    contract = contract_res.data[0]
+    if contract.get("signed_at"):
+        return {"ok": True, "already_signed": True, "signed_at": contract["signed_at"]}
+
+    now_iso = datetime.utcnow().isoformat()
+    db().table("contracts").update({
+        "signed_at": now_iso,
+        "signed_by_user_id": current_user["user_id"],
+    }).eq("id", contract["id"]).execute()
+    db().table("license_requests").update({"status": "active"}).eq("id", license_id).execute()
+    _log_audit(license_id, "contract_agent", "contract_signed",
+               f"Contract {contract['id']} signed by user {current_user['user_id']}")
+    return {"ok": True, "signed_at": now_iso, "contract_id": contract["id"]}
+
+
+@app.get("/api/licensing/{license_id}/contract-status")
+def get_contract_status(license_id: int, current_user: dict = Depends(get_current_user)):
+    """Returns {has_contract, is_signed, signed_at} for UI gating."""
+    lic_res = db().table("license_requests").select("*").eq("id", license_id).limit(1).execute()
+    if not lic_res.data:
+        raise HTTPException(404, "License not found")
+    # Anyone involved in the license (talent, client, linked agent) can check status.
+    lic = lic_res.data[0]
+    uid = current_user["user_id"]
+    role = current_user["role"]
+    authorized = False
+    if role == "client":
+        client_pid = _get_user_profile_id(uid, "client")
+        authorized = client_pid == lic["client_id"]
+    elif role == "talent":
+        talent_pid = _get_user_profile_id(uid, "talent")
+        authorized = talent_pid == lic["talent_id"]
+    elif role == "agent":
+        agent_pid = _get_user_profile_id(uid, "agent")
+        if agent_pid:
+            link = db().table("talent_agent_links").select("id").eq("agent_id", agent_pid).eq("talent_id", lic["talent_id"]).execute()
+            authorized = bool(link.data)
+    if not authorized:
+        raise HTTPException(403, "Not authorized")
+
+    contract_res = db().table("contracts").select("id,signed_at,signed_by_user_id,created_at").eq("license_id", license_id).order("created_at", desc=True).limit(1).execute()
+    if not contract_res.data:
+        return {"has_contract": False, "is_signed": False, "signed_at": None}
+    c = contract_res.data[0]
+    return {
+        "has_contract": True,
+        "is_signed": bool(c.get("signed_at")),
+        "signed_at": c.get("signed_at"),
+        "contract_id": c["id"],
+    }
 
 
 # ============================================================================
