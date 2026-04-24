@@ -6,7 +6,7 @@
  * - 3-column grid (col-span-3 / col-span-6 / col-span-3)
  *   LEFT: My Face Profile, License Terms, Edit/Upload buttons, Connected Accounts
  *   CENTER: Onboarding banner, License Passports, License prefs, Incoming Requests
- *   RIGHT: Active Licenses, Revenue, Pending, Face Identity Certificate, AI Chat
+ *   RIGHT: Active Licenses, Revenue, Pending, Identity Certificate, AI Chat
  *
  * Accessible at: /talent/dashboard (requires talent role)
  */
@@ -728,10 +728,10 @@ export default function TalentDashboardPage() {
               </p>
             </div>
 
-            {/* Incoming License Requests */}
+            {/* License Requests */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-5">
-                Incoming License Requests
+                License Requests
               </h3>
 
               {requests.length === 0 ? (
@@ -836,7 +836,7 @@ export default function TalentDashboardPage() {
                                     }
                                     className="flex items-center gap-1 text-xs font-medium bg-red-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-red-700 transition-colors"
                                   >
-                                    <XCircle className="h-3 w-3" /> Reject
+                                    <XCircle className="h-3 w-3" /> Decline
                                   </button>
                                 </>
                               )}
@@ -958,10 +958,10 @@ export default function TalentDashboardPage() {
               </div>
             </div>
 
-            {/* Face Identity Certificate */}
+            {/* Identity Certificate */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                Face Identity Certificate
+                Identity Certificate
               </h3>
               {profile ? (
                 <div className="rounded-lg bg-gradient-to-br from-gray-900 to-black p-5 text-white">

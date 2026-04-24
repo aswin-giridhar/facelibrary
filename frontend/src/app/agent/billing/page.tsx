@@ -205,7 +205,7 @@ export default function AgentBillingPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-gray-700" />
-              <h2 className="text-base font-semibold">Bank Account for Payouts</h2>
+              <h2 className="text-base font-semibold">🏦 Bank Account for Payouts</h2>
             </div>
             {bank && !editingBank && (
               <button
@@ -335,7 +335,7 @@ export default function AgentBillingPage() {
           <div className="flex items-start gap-3">
             <Shield className="w-5 h-5 text-gray-700 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h2 className="text-base font-semibold mb-1">Platform Commission</h2>
+              <h2 className="text-base font-semibold mb-1">📊 Platform Commission</h2>
               <p className="text-sm text-gray-600 mb-3">
                 Face Library retains {Math.round(COMMISSION_RATE * 100)}% of each licensed deal you
                 originate. The remainder is split between your talent and your
@@ -363,7 +363,7 @@ export default function AgentBillingPage() {
         {/* Payout History — projected from approved licenses */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-base font-semibold">Payout History</h2>
+            <h2 className="text-base font-semibold">🧾 Payout History</h2>
           </div>
           {licenses.length === 0 ? (
             <div className="p-10 text-center text-sm text-gray-500">

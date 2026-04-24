@@ -182,7 +182,7 @@ export default function AgentLicensesPage() {
             <section>
               <div className="flex items-center gap-2 mb-4">
                 <Inbox className="w-5 h-5 text-gray-700" />
-                <h2 className="text-xl font-semibold">Incoming Requests</h2>
+                <h2 className="text-xl font-semibold">📩 Incoming Requests</h2>
                 <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{pending.length}</span>
               </div>
               {pending.length === 0 ? (
@@ -251,7 +251,7 @@ export default function AgentLicensesPage() {
             <section>
               <div className="flex items-center gap-2 mb-4">
                 <CheckCircle className="w-5 h-5 text-green-600" />
-                <h2 className="text-xl font-semibold">Active Licenses</h2>
+                <h2 className="text-xl font-semibold">✅ Active Licenses</h2>
                 <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{active.length}</span>
               </div>
               {active.length === 0 ? (

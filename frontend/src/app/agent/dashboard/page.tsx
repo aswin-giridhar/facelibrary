@@ -276,7 +276,7 @@ export default function AgentDashboardPage() {
             {/* Agency Profile */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">
-                Agency Profile
+                🏢 Agency Profile
               </h3>
               <div className="space-y-3">
                 <div>
@@ -379,7 +379,7 @@ export default function AgentDashboardPage() {
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-gray-900">
-                  Your Talents
+                  👥 Your Talents
                 </h3>
                 <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                   {managedTalents.length}
@@ -424,7 +424,7 @@ export default function AgentDashboardPage() {
             {/* License Requests (Figma center col) */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">
-                License Requests
+                📩 License Requests
               </h3>
               {requests.length === 0 ? (
                 <p className="text-sm text-gray-500">No requests yet.</p>
@@ -528,7 +528,7 @@ export default function AgentDashboardPage() {
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-gray-900">
-                  Contracts &amp; IP
+                  📄 Contracts &amp; IP
                 </h3>
                 <Link
                   href="/contract-templates"
@@ -655,7 +655,7 @@ export default function AgentDashboardPage() {
             {/* Agency Earnings (Figma right col top) */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">
-                Agency Earnings
+                💵 Agency Earnings
               </h3>
               <div className="text-center py-3 rounded-lg bg-gray-50 border border-gray-200 mb-4">
                 <p className="text-2xl font-bold text-gray-900">
@@ -752,7 +752,7 @@ export default function AgentDashboardPage() {
             {/* Activity */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">
-                Activity
+                🔔 Activity
               </h3>
               {activity.length === 0 ? (
                 <p className="text-sm text-gray-500">
