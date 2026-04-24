@@ -369,7 +369,7 @@ export default function TalentMyFacePage() {
                     <>
                       {reference && (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={reference} alt={`${label} reference`} className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
+                        <img src={reference} alt={`${label} reference`} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
                       )}
                       <div className="absolute inset-0 bg-white/60 group-hover:bg-white/40 transition-colors flex flex-col items-center justify-center gap-2">
                         {isUploading ? (
@@ -432,7 +432,7 @@ export default function TalentMyFacePage() {
                     <>
                       {reference && (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={reference} alt={`${label} reference`} className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
+                        <img src={reference} alt={`${label} reference`} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
                       )}
                       <div className="absolute inset-0 bg-white/60 group-hover:bg-white/40 transition-colors flex flex-col items-center justify-center gap-2">
                         {isUploading ? (
@@ -502,7 +502,7 @@ export default function TalentMyFacePage() {
                     <>
                       {reference && (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={reference} alt={`${label} reference`} className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
+                        <img src={reference} alt={`${label} reference`} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
                       )}
                       <div className="absolute inset-0 bg-white/60 group-hover:bg-white/40 transition-colors flex flex-col items-center justify-center gap-2">
                         {isUploading ? (
@@ -565,7 +565,7 @@ export default function TalentMyFacePage() {
                     <>
                       {reference && (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={reference} alt={`${label} reference`} className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
+                        <img src={reference} alt={`${label} reference`} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover grayscale opacity-60" />
                       )}
                       <div className="absolute inset-0 bg-white/60 group-hover:bg-white/40 transition-colors flex flex-col items-center justify-center gap-2">
                         {isUploading ? (
