@@ -329,6 +329,9 @@ export const editLicenseTerms = (
 export const getAvatarJob = (jobId: number) =>
   fetchAPI(`/api/talent/avatar/${jobId}`);
 
+export const listAvatarJobs = (talentId: number) =>
+  fetchAPI(`/api/talent/${talentId}/avatar-jobs`);
+
 // Messages
 export interface ConversationSummary {
   id: number;

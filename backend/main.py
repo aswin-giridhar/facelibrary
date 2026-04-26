@@ -1590,6 +1590,43 @@ def get_avatar_job(job_id: int, current_user: dict = Depends(get_current_user)):
     return _maybe_complete_avatar_job(job)
 
 
+@app.get("/api/talent/{talent_id}/avatar-jobs")
+def list_avatar_jobs(talent_id: int, current_user: dict = Depends(get_current_user)):
+    """List avatar jobs for a talent (most recent first). Used by /talent/my-face
+    to detect an in-flight job and render the "Generating — up to 24 hours" banner.
+    Authz: the talent themselves or a linked agent."""
+    talent_res = db().table("talent_profiles").select("user_id").eq("id", talent_id).limit(1).execute()
+    if not talent_res.data:
+        raise HTTPException(404, "Talent not found")
+    talent_user_id = talent_res.data[0]["user_id"]
+
+    is_self = talent_user_id == current_user["user_id"]
+    is_linked_agent = False
+    if current_user["role"] == "agent":
+        agent_pid = _get_user_profile_id(current_user["user_id"], "agent")
+        if agent_pid:
+            link = db().table("talent_agent_links").select("id").eq("agent_id", agent_pid).eq("talent_id", talent_id).execute()
+            is_linked_agent = bool(link.data)
+    if not (is_self or is_linked_agent):
+        raise HTTPException(403, "Only the talent or their linked agent can view jobs")
+
+    res = (
+        db()
+        .table("avatar_jobs")
+        .select("*")
+        .eq("talent_id", talent_id)
+        .order("created_at", desc=True)
+        .limit(20)
+        .execute()
+    )
+    jobs = res.data or []
+    # Run the simulated-completion check for the most recent in-flight job so
+    # the caller sees an accurate status without a separate poll.
+    if jobs and jobs[0].get("status") in ("processing", "pending"):
+        jobs[0] = _maybe_complete_avatar_job(jobs[0])
+    return jobs
+
+
 # ============================================================================
 # AI CHAT (dashboard assistants + floating chat)
 # ============================================================================

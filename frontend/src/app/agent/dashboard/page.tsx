@@ -44,6 +44,7 @@ import {
   postChat,
   getActivityFeed,
   downloadAgencyStatement,
+  sendContractToTalent,
   type ChatMessage,
   type ActivityItem,
 } from "@/lib/api";
@@ -82,6 +83,7 @@ interface RequestData {
   desired_duration_days: number;
   proposed_price: number | null;
   created_at: string;
+  contract_generated?: boolean;
 }
 
 /* ---------- Constants ---------- */
@@ -103,6 +105,7 @@ export default function AgentDashboardPage() {
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [sendingContractId, setSendingContractId] = useState<number | null>(null);
 
   const handleChatSubmit = async () => {
     const text = chatMessage.trim();
@@ -183,6 +186,18 @@ export default function AgentDashboardPage() {
       if (user?.profile_id) loadData(user.profile_id);
     } catch {
       // error
+    }
+  };
+
+  const handleSendToTalent = async (id: number) => {
+    setSendingContractId(id);
+    try {
+      await sendContractToTalent(id);
+      if (user?.profile_id) loadData(user.profile_id);
+    } catch {
+      // swallow — UI shows status from refresh
+    } finally {
+      setSendingContractId(null);
     }
   };
 
@@ -489,40 +504,59 @@ export default function AgentDashboardPage() {
                 <p className="text-sm text-gray-500">No contracts yet.</p>
               ) : (
                 <div className="space-y-3">
-                  {requests.slice(0, 4).map((r) => (
-                    <div
-                      key={r.id}
-                      className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0"
-                    >
-                      <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-gray-900 truncate">
-                          {r.talent_name}{" "}
-                          <span className="text-gray-400">×</span>{" "}
-                          {r.brand_name}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {r.created_at
-                            ? new Date(r.created_at).toLocaleDateString("en-GB", {
-                                day: "2-digit", month: "short", year: "numeric",
-                              })
-                            : ""}
-                        </p>
-                      </div>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full capitalize font-medium ${
-                          r.status === "active" || r.status === "approved"
-                            ? "bg-green-50 text-green-700"
-                            : r.status === "pending" ||
-                              r.status === "awaiting_approval"
-                            ? "bg-amber-50 text-amber-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
+                  {requests.slice(0, 4).map((r) => {
+                    const canSend =
+                      r.contract_generated && r.status === "under_review";
+                    return (
+                      <div
+                        key={r.id}
+                        className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0"
                       >
-                        {r.status.replace(/_/g, " ")}
-                      </span>
-                    </div>
-                  ))}
+                        <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-gray-900 truncate">
+                            {r.talent_name}{" "}
+                            <span className="text-gray-400">×</span>{" "}
+                            {r.brand_name}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {r.created_at
+                              ? new Date(r.created_at).toLocaleDateString("en-GB", {
+                                  day: "2-digit", month: "short", year: "numeric",
+                                })
+                              : ""}
+                          </p>
+                        </div>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full capitalize font-medium ${
+                            r.status === "active" || r.status === "approved"
+                              ? "bg-green-50 text-green-700"
+                              : r.status === "pending" ||
+                                r.status === "awaiting_approval"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {r.status.replace(/_/g, " ")}
+                        </span>
+                        {canSend && (
+                          <button
+                            onClick={() => handleSendToTalent(r.id)}
+                            disabled={sendingContractId === r.id}
+                            className="text-xs px-2 py-1 rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                          >
+                            {sendingContractId === r.id ? "Sending…" : "Send to Talent"}
+                          </button>
+                        )}
+                        <Link
+                          href={`/license/${r.id}`}
+                          className="text-xs text-gray-500 hover:text-black hover:underline px-1"
+                        >
+                          View
+                        </Link>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

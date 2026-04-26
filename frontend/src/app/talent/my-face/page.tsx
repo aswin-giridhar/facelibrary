@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   Upload, User, Loader2, CheckCircle,
   Sun, Image as ImageIcon, Sparkles, Eye, Wind, Glasses, Smile,
-  Shield, Play,
+  Shield, Play, Clock,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   getTalent, listTalents, submitAvatarJob, uploadPhoto,
-  getTalentPortfolio, setTalentPortfolio,
+  getTalentPortfolio, setTalentPortfolio, listAvatarJobs,
 } from "@/lib/api";
 import { FIGMA_REFERENCE_IMAGES as REFERENCE_IMAGES } from "@/lib/figma-reference-images";
 import TalentTopNav from "@/components/TalentTopNav";
@@ -67,6 +67,9 @@ export default function TalentMyFacePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Latest avatar job — used to detect "Generating" state for the banner.
+  const [latestJob, setLatestJob] = useState<{ id: number; status: string } | null>(null);
+
   // Portfolio (3-slot showcase shown on /talent-profile/{id})
   const [portfolio, setPortfolio] = useState<(string | null)[]>([null, null, null]);
   const [portfolioSaving, setPortfolioSaving] = useState(false);
@@ -88,10 +91,14 @@ export default function TalentMyFacePage() {
         }
         setProfile(p);
         if (p) {
-          const existing = await getTalentPortfolio(p.id).catch(() => [] as string[]);
+          const [existing, jobs] = await Promise.all([
+            getTalentPortfolio(p.id).catch(() => [] as string[]),
+            listAvatarJobs(p.id).catch(() => [] as { id: number; status: string }[]),
+          ]);
           const padded: (string | null)[] = [null, null, null];
           existing.slice(0, 3).forEach((u, i) => { padded[i] = u; });
           setPortfolio(padded);
+          if (jobs && jobs.length > 0) setLatestJob(jobs[0]);
         }
       } finally {
         setLoading(false);
@@ -231,8 +238,33 @@ export default function TalentMyFacePage() {
           </div>
         )}
 
-        {/* Avatar status banner: No Avatar Yet */}
-        {!hasAvatar && (
+        {/* Avatar status banner: Generating (in-flight job, no avatar yet) */}
+        {!hasAvatar && latestJob && (latestJob.status === "processing" || latestJob.status === "pending") && (
+          <div className="mb-10 bg-blue-50 border border-blue-200 rounded-2xl p-6 flex items-center gap-5">
+            <div className="w-20 h-20 rounded-xl bg-white border border-blue-200 flex items-center justify-center flex-shrink-0">
+              <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="w-5 h-5 text-blue-600" />
+                <h3 className="font-semibold">Your avatar is being generated</h3>
+              </div>
+              <p className="text-sm text-gray-700">
+                Your submission is under verification and generation. This can take up
+                to 24 hours. We&apos;ll email you once it&apos;s ready.
+              </p>
+            </div>
+            <Link
+              href={`/avatar-generating?jobId=${latestJob.id}`}
+              className="inline-flex items-center gap-2 border border-blue-300 bg-white text-blue-700 px-4 py-2 rounded-lg text-sm hover:border-blue-600 transition-colors"
+            >
+              View Status
+            </Link>
+          </div>
+        )}
+
+        {/* Avatar status banner: No Avatar Yet (no in-flight job either) */}
+        {!hasAvatar && !(latestJob && (latestJob.status === "processing" || latestJob.status === "pending")) && (
           <div className="mb-10 bg-gray-50 border border-gray-200 rounded-2xl p-6 flex items-center gap-5">
             <div className="w-20 h-20 rounded-xl bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
               <Shield className="w-10 h-10 text-gray-400" />
