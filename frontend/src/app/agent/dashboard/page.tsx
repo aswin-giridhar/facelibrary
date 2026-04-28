@@ -33,10 +33,12 @@ import {
   Instagram,
   Globe,
   Image as ImageIcon,
+  Edit3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { FloatingAIChat } from "@/components/FloatingAIChat";
 import AgentTopNav from "@/components/AgentTopNav";
+import EditProfileModal from "@/components/EditProfileModal";
 import {
   getAgent,
   getAgentRequests,
@@ -45,6 +47,7 @@ import {
   getActivityFeed,
   downloadAgencyStatement,
   sendContractToTalent,
+  updateAgent,
   type ChatMessage,
   type ActivityItem,
 } from "@/lib/api";
@@ -106,6 +109,7 @@ export default function AgentDashboardPage() {
   const [chatError, setChatError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [sendingContractId, setSendingContractId] = useState<number | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const handleChatSubmit = async () => {
     const text = chatMessage.trim();
@@ -238,9 +242,18 @@ export default function AgentDashboardPage() {
           <div className="col-span-12 lg:col-span-3 space-y-6">
             {/* Agency Profile */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">
-                🏢 Agency Profile
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900">
+                  🏢 Agency Profile
+                </h3>
+                <button
+                  onClick={() => setEditOpen(true)}
+                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-black transition-colors"
+                  aria-label="Edit Agency Profile"
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> Edit
+                </button>
+              </div>
               <div className="space-y-3">
                 <div>
                   <p className="text-base font-semibold text-gray-900">
@@ -802,25 +815,37 @@ export default function AgentDashboardPage() {
               </Link>
             </div>
 
-            {/* Billing & Payouts shortcut */}
-            <div className="grid grid-cols-2 gap-2">
-              <Link
-                href="/agent/billing"
-                className="block text-center text-sm bg-black text-white py-3 rounded-xl hover:bg-gray-800 transition-colors"
-              >
-                Billing &amp; Payouts →
-              </Link>
-              <Link
-                href="/agent/billing#payout-history"
-                className="block text-center text-sm border border-gray-300 text-gray-700 py-3 rounded-xl hover:border-black hover:text-black transition-colors"
-              >
-                View All Payouts →
-              </Link>
-            </div>
           </div>
         </div>
       </div>
       <FloatingAIChat variant="agent" />
+      <EditProfileModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Edit Agency Profile"
+        fields={[
+          { name: "name", label: "Your Name", placeholder: "Jane Smith" },
+          { name: "agency_name", label: "Agency Name", placeholder: "Acme Talent" },
+          { name: "website", label: "Website", type: "url", placeholder: "https://acme.com" },
+          { name: "instagram", label: "Instagram", placeholder: "@acmetalent" },
+          { name: "industry", label: "Industry", placeholder: "Modeling, Music, Sports…" },
+          { name: "portfolio_url", label: "Portfolio URL", type: "url" },
+        ]}
+        initial={{
+          name: profile?.name ?? user?.name ?? "",
+          agency_name: profile?.agency_name ?? "",
+          website: profile?.website ?? "",
+          instagram: (profile as { instagram?: string } | null)?.instagram ?? "",
+          industry: (profile as { industry?: string } | null)?.industry ?? "",
+          portfolio_url: (profile as { portfolio_url?: string } | null)?.portfolio_url ?? "",
+        }}
+        onSave={async (data) => {
+          if (!profile?.id) throw new Error("Agency profile not loaded");
+          await updateAgent(profile.id, data);
+          const fresh = await getAgent(profile.id);
+          setProfile(fresh as AgentProfileData);
+        }}
+      />
     </div>
   );
 }

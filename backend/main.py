@@ -357,6 +357,23 @@ class AgentRegisterRequest(BaseModel):
     instagram: str | None = Field(None, max_length=255)
     industry: str | None = Field(None, max_length=100)
 
+class AgentUpdateRequest(BaseModel):
+    agency_name: str | None = Field(None, min_length=1, max_length=255)
+    website: str | None = Field(None, max_length=500)
+    portfolio_url: str | None = Field(None, max_length=500)
+    instagram: str | None = Field(None, max_length=255)
+    industry: str | None = Field(None, max_length=100)
+    name: str | None = Field(None, min_length=1, max_length=255)
+
+class ClientUpdateRequest(BaseModel):
+    company_name: str | None = Field(None, min_length=1, max_length=255)
+    industry: str | None = Field(None, max_length=100)
+    website: str | None = Field(None, max_length=500)
+    phone: str | None = Field(None, max_length=50)
+    role_title: str | None = Field(None, max_length=100)
+    description: str | None = Field(None, max_length=2000)
+    name: str | None = Field(None, min_length=1, max_length=255)
+
 class LicenseRequestCreate(BaseModel):
     talent_id: int
     license_type: str = Field("standard", pattern="^(standard|exclusive|time_limited)$")
@@ -704,6 +721,23 @@ def get_client(client_id: int, current_user: dict = Depends(get_current_user)):
     }
 
 
+@app.put("/api/client/{client_id}")
+def update_client(client_id: int, req: ClientUpdateRequest, current_user: dict = Depends(get_current_user)):
+    c_res = db().table("client_profiles").select("user_id").eq("id", client_id).execute()
+    if not c_res.data:
+        raise HTTPException(404, "Client not found")
+    if c_res.data[0]["user_id"] != current_user["user_id"]:
+        raise HTTPException(403, "Not your profile")
+
+    payload = req.model_dump(exclude_none=True)
+    new_name = payload.pop("name", None)
+    if payload:
+        db().table("client_profiles").update(payload).eq("id", client_id).execute()
+    if new_name:
+        db().table("users").update({"name": new_name}).eq("id", current_user["user_id"]).execute()
+    return {"ok": True}
+
+
 @app.get("/api/client/{client_id}/requests")
 def get_client_requests(client_id: int, current_user: dict = Depends(get_current_user)):
     c_res = db().table("client_profiles").select("user_id").eq("id", client_id).execute()
@@ -796,6 +830,23 @@ def get_agent(agent_id: int, current_user: dict = Depends(get_current_user)):
         "portfolio_url": a.get("portfolio_url"), "instagram": a.get("instagram"),
         "industry": a.get("industry"), "managed_talents": managed,
     }
+
+
+@app.put("/api/agent/{agent_id}")
+def update_agent(agent_id: int, req: AgentUpdateRequest, current_user: dict = Depends(get_current_user)):
+    a_res = db().table("agent_profiles").select("user_id").eq("id", agent_id).execute()
+    if not a_res.data:
+        raise HTTPException(404, "Agent not found")
+    if a_res.data[0]["user_id"] != current_user["user_id"]:
+        raise HTTPException(403, "Not your profile")
+
+    payload = req.model_dump(exclude_none=True)
+    new_name = payload.pop("name", None)
+    if payload:
+        db().table("agent_profiles").update(payload).eq("id", agent_id).execute()
+    if new_name:
+        db().table("users").update({"name": new_name}).eq("id", current_user["user_id"]).execute()
+    return {"ok": True}
 
 
 @app.get("/api/agent/{agent_id}/requests")

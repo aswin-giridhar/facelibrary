@@ -28,15 +28,18 @@ import {
   Tag,
   MapPin,
   Download,
+  Edit3,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast, Toaster } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { FloatingAIChat } from "@/components/FloatingAIChat";
 import BrandTopNav from "@/components/BrandTopNav";
+import EditProfileModal from "@/components/EditProfileModal";
 import {
   listTalents,
   getClient,
+  updateClient,
   createLicenseRequest,
   getClientRequests,
   generateContract,
@@ -182,6 +185,17 @@ export default function ClientDashboardPage() {
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [clientProfile, setClientProfile] = useState<{
+    id: number;
+    name?: string | null;
+    company_name?: string | null;
+    industry?: string | null;
+    website?: string | null;
+    phone?: string | null;
+    role_title?: string | null;
+    description?: string | null;
+  } | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const handleExportToExcel = () => {
     setIsExporting(true);
@@ -271,8 +285,12 @@ export default function ClientDashboardPage() {
       }
 
       if (profileId) {
-        const r = await getClientRequests(profileId);
+        const [r, cp] = await Promise.all([
+          getClientRequests(profileId),
+          getClient(profileId).catch(() => null),
+        ]);
         setRequests(r);
+        if (cp) setClientProfile(cp);
       }
     } catch {
       // silent
@@ -421,9 +439,18 @@ export default function ClientDashboardPage() {
           <div className="col-span-12 lg:col-span-3 space-y-6">
             {/* Brand Profile */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">
-                Brand Profile
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Brand Profile
+                </h3>
+                <button
+                  onClick={() => setEditOpen(true)}
+                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-black transition-colors"
+                  aria-label="Edit Brand Profile"
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> Edit
+                </button>
+              </div>
               <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mb-4">
                 <Building2 className="w-8 h-8 text-gray-400" />
               </div>
@@ -946,6 +973,35 @@ export default function ClientDashboardPage() {
       </div>
       <FloatingAIChat variant="client" />
       <Toaster position="top-right" richColors />
+      <EditProfileModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Edit Brand Profile"
+        fields={[
+          { name: "name", label: "Your Name", placeholder: "Jane Smith" },
+          { name: "company_name", label: "Company Name", placeholder: "Acme Corp" },
+          { name: "industry", label: "Industry", placeholder: "Fashion, Tech, Beauty…" },
+          { name: "website", label: "Website", type: "url", placeholder: "https://acme.com" },
+          { name: "role_title", label: "Your Role", placeholder: "Marketing Director" },
+          { name: "phone", label: "Phone", type: "tel" },
+          { name: "description", label: "Brand Description", type: "textarea" },
+        ]}
+        initial={{
+          name: clientProfile?.name ?? user?.name ?? "",
+          company_name: clientProfile?.company_name ?? "",
+          industry: clientProfile?.industry ?? "",
+          website: clientProfile?.website ?? "",
+          role_title: clientProfile?.role_title ?? "",
+          phone: clientProfile?.phone ?? "",
+          description: clientProfile?.description ?? "",
+        }}
+        onSave={async (data) => {
+          if (!clientProfile?.id) throw new Error("Brand profile not loaded");
+          await updateClient(clientProfile.id, data);
+          const fresh = await getClient(clientProfile.id);
+          setClientProfile(fresh);
+        }}
+      />
     </div>
   );
 }

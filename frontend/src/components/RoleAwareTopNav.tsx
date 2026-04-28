@@ -68,7 +68,7 @@ export default function RoleAwareTopNav({ active }: { active: string }) {
               <Link
                 key={tab.label}
                 href={tab.href}
-                className={`px-3 py-4 text-sm transition-colors relative ${
+                className={`px-4 py-4 text-sm whitespace-nowrap transition-colors relative ${
                   isActive ? "text-black font-medium" : "text-gray-500 hover:text-black"
                 }`}
               >

@@ -84,6 +84,9 @@ export const registerClient = (data: Record<string, unknown>) =>
 
 export const getClient = (id: number) => fetchAPI(`/api/client/${id}`);
 
+export const updateClient = (id: number, data: Record<string, unknown>) =>
+  fetchAPI(`/api/client/${id}`, { method: "PUT", body: JSON.stringify(data) });
+
 export const getClientRequests = (id: number) => fetchAPI(`/api/client/${id}/requests`);
 
 // Backward compat
@@ -96,6 +99,9 @@ export const registerAgent = (data: Record<string, unknown>) =>
   fetchAPI("/api/agent/register", { method: "POST", body: JSON.stringify(data) });
 
 export const getAgent = (id: number) => fetchAPI(`/api/agent/${id}`);
+
+export const updateAgent = (id: number, data: Record<string, unknown>) =>
+  fetchAPI(`/api/agent/${id}`, { method: "PUT", body: JSON.stringify(data) });
 
 export const getAgentRequests = (id: number) => fetchAPI(`/api/agent/${id}/requests`);
 
